@@ -25,7 +25,7 @@ MacDub captures the audio of any app (Zoom, Teams, VLC, Safari, Chrome, Music �
 | **Capture** | One app or the entire system | Per-app capture follows helper processes (Chrome/Electron helpers, WebKit for Safari); "🔊 Entire system" captures everything except MacDub's own voice. Zoom, Teams, VLC, browsers, Music… The microphone is never captured. |
 | | Original audio in the background | Core Audio *process tap* engine: the original is removed from the output and re-played at the level you choose (default 25 %), or lowered only while the translated voice speaks — documentary style. |
 | | ScreenCaptureKit fallback | Used automatically when the app has no audio process yet (no background mix in that mode). |
-| | Audio buffer for snippets | The last 60 s (configurable, 0 = off) stay in memory so an assistant can request a WAV excerpt through MCP; never written to disk unless asked. |
+| | Audio buffer for snippets | The last 60 s (configurable in *Settings › AI & MCP*, 0 = off) stay in memory so an assistant can request a WAV excerpt through MCP; never written to disk unless asked. |
 | **Recognition** | On-device speech recognition | `SFSpeechRecognizer` with on-device models (macOS 15+). |
 | | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. |
 | | Smart sentence segmentation | Cuts on punctuation, clause marks, length, pending time and silence; re-anchors when the recognizer rewrites earlier words. Unit-tested. |
@@ -33,17 +33,17 @@ MacDub captures the audio of any app (Zoom, Teams, VLC, Safari, Chrome, Music �
 | **Voice** | System voices with quality badges | 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ novelty; per-voice rate and volume; one-click reload after downloading voices. (Siri voices are not available to third-party apps.) |
 | | Latency management | Gentle speed-up when behind (configurable or off), stale sentences skipped past *Max delay*, backlog dropped with one click. Measured: translation ≈ 0.4 s, sentence end → voice ≈ 0.8 s with an empty queue, ≈ 2 s mean. |
 | | Karaoke highlighting | The word being spoken is highlighted in the panel, the floating bar and the menu bar panel. |
-| **Subtitles** | Transcript panel | Original + translation, per-sentence latency, auto-scroll toggle, subtitles-only mode (voice off). |
+| **Subtitles** | Transcript | While dubbing, the Dubbing screen becomes the live transcript: original + translation, per-sentence latency, level meter, skip/clear. The Subtitles screen holds the transcript options and exports; subtitles-only mode = voice off. |
 | | Floating subtitle bar (⌘B) | Always-on-top pill: 1–6 lines, adjustable width and text size, drag handle, Stop/Start, quick settings, hide. |
 | **Menu bar** | Status icon | Green dot while dubbing, amber while starting; click for a panel with the last lines, Start/Stop and quick controls; right-click for a menu. |
 | | Menu-bar-only mode | Hide the Dock icon; open at login. |
 | | Automation | Auto-start when the selected app starts playing audio; silence watchdog (notice or automatic stop). |
 | **Shortcuts** | Global | ⌃⌥D start/stop · ⌃⌥S subtitle bar (no Accessibility permission needed). |
-| | In-app | ⌘R start/stop · ⌘B subtitle bar · ⌘K skip backlog · ⌘L clear · ⌘E export .srt · ⇧⌘E export .md · ⌘Y history. |
-| **Transcripts** | Export | `.srt` (translation / original / both), `.md` with a session header (made for LLMs), `.txt`. |
-| | Session history (⌘Y) | Every session archived when it stops; reopen, export or delete. |
+| | In-app | ⌘R start/stop · ⌘B subtitle bar · ⌘K skip backlog · ⌘L clear (starts a new session) · ⌘E export .srt · ⇧⌘E export .md · ⌘Y history · ⌘, settings. |
+| **Transcripts** | Export | `.srt` (translation / original / both), `.md` with a session header (made for LLMs), `.txt`. File names carry no spaces (`macdub-transcript-<date>.<ext>`). |
+| | Session history (⌘Y) | Every session archived when it stops, with the original audio recorded as AAC (`~/.macdub/audio`). Play it back with a live spectrum while the transcript follows karaoke-style — original audio only, documentary style (original lowered under the translated voice) or translated voice only, with original / translated / both texts, remembered between sessions; export audio + `.srt` under one name (`macdub-audio-<date>.m4a/.srt`) so VLC picks the subtitles up; delete a session and its audio goes with it. Settings › General shows the size of `~/.macdub` and offers *Delete all sessions* and *Factory reset*. |
 | **AI** | Summaries | Claude Code and Codex CLIs, Ollama and LM Studio (choose the model), Apple Intelligence on macOS 26, or paste into Claude Desktop / ChatGPT — in the dubbing target language. |
-| | MCP server | 16 tools, live resources with push notifications, saved sessions as resources, 3 prompts; stdio and Streamable HTTP transports; server-side summaries with local models; one-click registration for Claude Code, Claude Desktop and Codex that survives moving the app. |
+| | MCP server | 18 tools (including History: list/delete sessions, export audio + `.srt`, storage usage), live resources with push notifications, saved sessions as resources, 3 prompts; stdio and Streamable HTTP transports; server-side summaries with local models; one-click registration for Claude Code, Claude Desktop and Codex that survives moving the app. |
 | **Platform** | Requirements | macOS 15 Sequoia or later (tested on 15.7.3), Intel and Apple Silicon (universal binary). |
 | | Build | No Xcode needed — Command Line Tools with Swift 6; `make setup` installs them if missing. No third-party dependencies. |
 | | Languages | Interface in English, Spanish and Portuguese (Brazil); adding one is copying a folder. |
@@ -86,11 +86,26 @@ There are **no third-party dependencies** — nothing is downloaded. The only re
 1. **Screen & System Audio Recording** — macOS asks on first launch. Enable MacDub in *System Settings › Privacy & Security* and **relaunch the app** (macOS only applies this grant after a relaunch).
 2. **Speech Recognition** — requested when you first press Start.
 3. **Spoken language** — pick one marked as on-device. If it says *needs download*, add the language under *System Settings › Keyboard › Dictation* so macOS fetches the model.
-4. **Translate to** — press *Prepare translation* once per language pair to download the model (needs internet that one time).
-5. **Voice** — choose a voice and press *Test voice*. For better voices: *Manage voices…* → *Accessibility › Spoken Content › System Voice › Manage Voices*, download **Enhanced/Premium** voices, then ↻.
-6. Pick **what to capture** (an app or 🔊 Entire system), play something and press **Start dubbing** (⌘R).
+4. **Translate to** — the first time a language pair is used, *Settings › Speech › Prepare translation* downloads the model (needs internet that one time); MacDub also offers it when you press Start.
+5. **Voice** — choose a voice and press ▶ to hear it. For better voices: *Settings › Voice › Manage voices…* → *Accessibility › Spoken Content › System Voice › Manage Voices*, download **Enhanced/Premium** voices, then ↻.
+6. Pick **what to capture** (an app or 🔊 Entire system), play something and press **Start** (⌘R).
 
 > With the tap engine the app must already be producing audio when you press Start; otherwise MacDub tells you and falls back to ScreenCaptureKit (no background mix).
+
+## The app
+
+One dark window with a sidebar of four screens, plus a standard Settings window (⌘,) and a menu bar item.
+
+| Screen | What is there |
+|---|---|
+| **Dubbing** | The session choices: application (or 🔊 Entire system), spoken language, target language, voice with ▶ test, original audio level, speak on/off, and the round **Start** button. While dubbing the hero is replaced by the live transcript (karaoke highlighting, latency per sentence, level meter, Skip / Clear). |
+| **Subtitles** | Transcript options (include original, highlight spoken words, auto-scroll), the floating subtitle bar (⌘B) and the exports (.srt / .md / .txt). |
+| **History** (⌘Y) | Saved sessions with a player: spectrum, transport, scrubber, and the transcript following the audio karaoke-style. The ⋯ icon on the player picks what you hear (original only · documentary: original low under the translated voice · translated voice only) and what you read (original · translation · both); the choice is remembered. Export audio + `.srt`, or transcripts; delete removes the audio too. |
+| **AI & MCP** | Summaries with a local assistant (Claude Code / Codex CLIs, Ollama, LM Studio, Apple Intelligence) and one-click MCP registration for Claude Code, Claude Desktop and Codex. |
+
+**Settings (⌘,)** — *General* (interface language, menu-bar-only mode, open at login, global shortcuts, sessions & audio recording, storage size of `~/.macdub`, delete all sessions, factory reset) · *Capture* (engine, original level, auto-start, silence watchdog) · *Speech* (recognition engine, silence cut-off, translation model) · *Voice* (voice, rate, volume, catch-up policy) · *Subtitles* (transcript and floating bar) · *AI & MCP* (HTTP transport, audio buffer for snippets) · *Permissions*.
+
+**Menu bar** — green dot while dubbing; click for a panel with the last lines, Start/Stop and quick controls; right-click for a menu (start/stop, subtitle bar, settings, history, about, quit).
 
 ## MCP server
 
@@ -101,22 +116,23 @@ There are **no third-party dependencies** — nothing is downloaded. The only re
 | tool | `summarize_transcript` | summary produced **by a local model on the Mac** (Apple Intelligence on macOS 26, Ollama, LM Studio) so the transcript never enters the client's context; same range options, `sessionId` for saved sessions |
 | tool | `list_local_models` | which local summarisation providers/models exist |
 | tool | `search_transcript` | find sentences containing a phrase, with timestamps |
-| tool | `list_sessions` / `get_session` | saved sessions and their transcripts |
-| tool | `export_session` | write the live or a saved session to a file (srt/md/txt, `path`, `overwrite`) and return its path |
-| tool | `get_audio_snippet` | the last N seconds of captured audio as a 16 kHz mono WAV (file path, or embedded audio content with `inline`) — to double-check a sentence with an audio-capable model; MacDub keeps 60 s in memory by default (Settings › Keep audio for snippets) |
+| tool | `list_sessions` / `get_session` / `delete_session` | saved sessions (with `audioPath` when the original audio was recorded) and their transcripts; delete removes transcript and audio |
+| tool | `get_storage` | disk used by recorded audio (`~/.macdub`) and transcripts, sessions with/without audio — for clean-ups |
+| tool | `export_session` | write the live or a saved session to a file (srt/md/txt, `path`, `overwrite`) and return its path; format `audio` copies a saved session's original audio as `<name>.m4a` next to `<name>.srt` so VLC loads the subtitles automatically (`macdub-audio-<date>` by default) |
+| tool | `get_audio_snippet` | the last N seconds of captured audio as a 16 kHz mono WAV (file path, or embedded audio content with `inline`) — to double-check a sentence with an audio-capable model; MacDub keeps 60 s in memory by default (*Settings › AI & MCP › Keep audio for snippets*) |
 | tool | `start_dubbing` / `stop_dubbing` / `clear_transcript` | control the app (`bundleIdentifier` or `system`; apps launched after MacDub are picked up, and the start is confirmed with the engines in use) |
 | tool | `set_languages`, `set_voice`, `set_speak`, `set_original_volume` | change languages (while idle), voice, mute the dub, background level — live |
 | resource | `macdub://transcript`, `macdub://status` | attachable live context; **subscribable** — the server pushes `notifications/resources/updated` as sentences arrive |
 | resource | `macdub://sessions/<id>` (+ `/md|txt|srt|json`) | every saved session is listed as a resource (and offered as templates) so it can be attached as context; `list_changed` fires when sessions are added or deleted |
 | prompt | `summarize`, `action_items`, `check_translation` | ready-made instructions over the live transcript |
 
-Register from the app (*AI assistants & MCP › Add to Claude Code / Claude Desktop / Codex*) or by hand:
+Register from the app (*AI & MCP › Add to Claude Code / Claude Desktop / Codex*) or by hand:
 
 ```bash
 # stdio (recommended: Claude Code starts the server on demand). The launcher below is written by
 # MacDub on launch and follows the app if you move it; the bundle path works too.
 claude mcp add --scope user macdub "$HOME/Library/Application Support/MacDub/bin/macdub-mcp"
-# HTTP (when the app serves it: AI assistants & MCP › Also serve over HTTP)
+# HTTP (when the app serves it: Settings › AI & MCP › Also serve over HTTP)
 claude mcp add --transport http --scope user macdub-http http://127.0.0.1:8765/mcp
 ```
 
@@ -124,27 +140,30 @@ claude mcp add --transport http --scope user macdub-http http://127.0.0.1:8765/m
 { "mcpServers": { "macdub": { "command": "/Users/<you>/Library/Application Support/MacDub/bin/macdub-mcp" } } }
 ```
 
-How it works: the app writes `~/Library/Application Support/MacDub/live.json` a few times per second and archives sessions in `sessions/`; the server reads those files and sends commands back through `DistributedNotificationCenter`. MacDub must be running for live data.
+How it works: the app writes `~/Library/Application Support/MacDub/live.json` a few times per second and archives sessions in `sessions/` (recorded audio goes to `~/.macdub/audio/<id>.m4a`); the server reads those files and sends commands back through `DistributedNotificationCenter`. MacDub must be running for live data; saved sessions, storage and exports work even when it is not.
 
-**Transports.** stdio by default. `macdub-mcp --http 8765 [--token SECRET]` serves the MCP *Streamable HTTP* transport at `http://127.0.0.1:8765/mcp` (POST for requests and batches, GET with `Accept: text/event-stream` for server notifications, optional bearer token, non-localhost `Origin` rejected). It binds to loopback only; for a remote assistant put it behind a tunnel or reverse proxy with TLS. The app can run it for you: *AI assistants & MCP › Also serve over HTTP on port*.
+**Transports.** stdio by default. `macdub-mcp --http 8765 [--token SECRET]` serves the MCP *Streamable HTTP* transport at `http://127.0.0.1:8765/mcp` (POST for requests and batches, GET with `Accept: text/event-stream` for server notifications, optional bearer token, non-localhost `Origin` rejected). It binds to loopback only; for a remote assistant put it behind a tunnel or reverse proxy with TLS. The app can run it for you: *Settings › AI & MCP › Also serve over HTTP on port*.
 
 ## Architecture
 
 ```
 Sources/MacDubCore/            Pure logic, no UI frameworks, unit-tested:
-                               Segment, TranscriptSegmenter, TranscriptExporter (srt/md/txt),
-                               SpeechRate, LiveState, SessionStore
+                               Segment, TranscriptSegmenter, TranscriptExporter (srt/md/txt + cue timing),
+                               Karaoke (word timing for playback), SpeechRate, LiveState,
+                               SessionStore + MacDubPaths (~/.macdub)
 Sources/MacDubMCP/main.swift   MCP server (JSON-RPC over stdio) → Contents/Helpers/macdub-mcp
 Sources/MacDub/
   App/                         MacDubApp (scenes, menus), AppState (pipeline coordinator),
                                AppDelegate, StatusBarController (menu bar)
   Audio/                       ProcessTapCaptureManager (Core Audio tap, default),
-                               AudioCaptureManager (ScreenCaptureKit fallback)
+                               AudioCaptureManager (ScreenCaptureKit fallback), AudioRingBuffer,
+                               SessionAudioRecorder (AAC take per session), SessionPlayer (+ FFT spectrum)
   Speech/                      SpeechAndTranslationManager, RecognitionEngine (+ SFSpeechEngine),
                                SpeechAnalyzerEngine (macOS 26), TranslationBridge
   Voice/                       VoiceSynthesisManager (AVSpeechSynthesizer + backlog policy)
-  UI/                          ControlPanelView, SubtitlesView, FloatingSubtitlesView (pill),
-                               MenuBarPanelView, HistoryView, AIIntegrationView, SpokenText
+  UI/                          MainView (sidebar + sections), SettingsView (⌘,), Theme (building blocks),
+                               SubtitlesView, FloatingSubtitlesView (pill), MenuBarPanelView,
+                               HistoryView (player + karaoke transcript), AIIntegrationView, SpokenText
   Support/                     Settings, Localization, AIIntegration (summaries, MCP install),
                                AppleIntelligenceSummarizer, GlobalHotKey, LaunchAtLogin, errors
   Resources/<lang>.lproj/      Localizable.strings
@@ -164,17 +183,19 @@ Casks/macdub.rb                Homebrew cask (updated by release.sh)
 
 **Voice.** `AVSpeechSynthesizer` serializes utterances; MacDub adds a catch-up policy (rate boost per queued sentence, capped), stale-sentence skipping and backlog dropping, plus per-word highlighting through `willSpeakRangeOfSpeechString`.
 
+**History playback.** The original audio of each session is recorded as mono AAC while dubbing (a session stopped and resumed keeps one file; the gap is padded with silence so the `.srt` cues stay aligned). `SessionPlayer` plays it through `AVAudioEngine` with an FFT spectrum; in the documentary and voice-only modes the translated voice is not a recording — the player speaks each translation with the same synthesizer as the live dub when its cue starts, so the highlighted word follows the real voice.
+
 ## Tests
 
 ```bash
 make test
 ```
 
-Swift Testing suites over `MacDubCore` (segmentation rules, catch-up policy, exporters). They run as an executable because `swift test` needs Xcode's `xctest` loader, which the Command Line Tools don't ship; `Package.swift` adds the CLT `Testing.framework` paths only when Xcode is absent.
+Swift Testing suites over `MacDubCore` (segmentation rules, catch-up policy, exporters and cue timing, karaoke word timing, session records). They run as an executable because `swift test` needs Xcode's `xctest` loader, which the Command Line Tools don't ship; `Package.swift` adds the CLT `Testing.framework` paths only when Xcode is absent.
 
 ## Translations
 
-The UI follows the system language (or *Interface › Language*). To add a language: copy `Sources/MacDub/Resources/en.lproj` to `<code>.lproj`, translate the values in `Localizable.strings` (keys are the English text), add a case to `InterfaceLanguage` in `Support/Localization.swift`, run `plutil -lint` and `make run`. Dynamic strings go through `L("…")` / `LF("…", args)`; SwiftUI literals localize on their own.
+The UI follows the system language (or *Settings › General › Language*). To add a language: copy `Sources/MacDub/Resources/en.lproj` to `<code>.lproj`, translate the values in `Localizable.strings` (keys are the English text), add a case to `InterfaceLanguage` in `Support/Localization.swift`, run `plutil -lint` and `make run`. Dynamic strings go through `L("…")` / `LF("…", args)`; SwiftUI literals localize on their own.
 
 ## Releasing
 
@@ -192,6 +213,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - Safari plays audio through shared WebKit XPC processes; tapping Safari can affect other WebKit apps.
 - No speaker diarization: everyone gets the same voice (the data model has a `speaker` field ready for it).
 - Siri voices cannot be used by third-party apps.
+- History playback highlights the original text by spreading each sentence over its words (the recognizer keeps no per-word timing); the translated text follows the voice exactly.
 
 ## Roadmap
 

@@ -44,16 +44,43 @@ public enum TranscriptExporter {
         }
     }
 
+    /// When one sentence is on screen, in seconds from the session start.
+    public struct Cue: Equatable {
+        public var start: TimeInterval
+        public var end: TimeInterval
+        public init(start: TimeInterval, end: TimeInterval) {
+            self.start = start
+            self.end = end
+        }
+        public var duration: TimeInterval { end - start }
+        public func contains(_ t: TimeInterval) -> Bool { t >= start && t < end }
+        /// 0 at `start`, 1 at `end`, clamped.
+        public func progress(at t: TimeInterval) -> Double {
+            guard duration > 0 else { return 1 }
+            return min(1, max(0, (t - start) / duration))
+        }
+    }
+
+    /// One cue per segment: from the previous cue's end to the segment's `recognizedAt`, never
+    /// shorter than half a second and never stretching back more than 6 s after a long gap. The
+    /// SRT export and the History player share this timing so what VLC shows is what MacDub shows.
+    public static func cues(for segments: [Segment], sessionStart: Date) -> [Cue] {
+        var out: [Cue] = []
+        var previousEnd: TimeInterval = 0
+        for segment in segments {
+            let end = max(segment.recognizedAt.timeIntervalSince(sessionStart), previousEnd + 0.5)
+            let start = max(previousEnd, end - 6)
+            out.append(Cue(start: start, end: end))
+            previousEnd = end
+        }
+        return out
+    }
+
     private static func srt(_ segments: [Segment], content: Content, sessionStart: Date) -> String {
         var out = ""
-        var previousEnd: TimeInterval = 0
-        for (i, segment) in segments.enumerated() {
-            let end = max(segment.recognizedAt.timeIntervalSince(sessionStart), previousEnd + 0.5)
-            // First cue (or after a long gap): don't stretch back more than 6 s.
-            let start = max(previousEnd, end - 6)
-            out += "\(i + 1)\n\(srtTime(start)) --> \(srtTime(end))\n"
+        for (i, (segment, cue)) in zip(segments, cues(for: segments, sessionStart: sessionStart)).enumerated() {
+            out += "\(i + 1)\n\(srtTime(cue.start)) --> \(srtTime(cue.end))\n"
             out += lines(for: segment, content: content).joined(separator: "\n") + "\n\n"
-            previousEnd = end
         }
         return out
     }

@@ -226,21 +226,23 @@ let tools: [Tool] = [
     ),
     Tool(
         name: "export_session",
-        description: "Write the current session (or a saved one with `sessionId`) to a file on disk as srt, md or txt, so the assistant can keep working with the file (e.g. hand a subtitle track to a video). `path` defaults to ~/Downloads/MacDub <date>.<ext>. Returns the absolute path.",
+        description: "Write the current session (or a saved one with `sessionId`) to a file on disk as srt, md or txt, so the assistant can keep working with the file (e.g. hand a subtitle track to a video). Format `audio` (saved sessions with recorded audio only) copies the original audio as `<name>.m4a` and writes `<name>.srt` next to it with the same name, so VLC and other players load the subtitles automatically. `path` defaults to ~/Downloads/macdub-transcript-<date>.<ext> (or macdub-audio-<date>.m4a). Returns the absolute path(s).",
         schema: ["type": "object", "properties": [
             "sessionId": ["type": "string"],
-            "format": ["type": "string", "enum": ["srt", "md", "txt"], "description": "Default srt"],
+            "format": ["type": "string", "enum": ["srt", "md", "txt", "audio"], "description": "Default srt. `audio` = .m4a + .srt pair"],
             "content": contentProperty,
-            "path": ["type": "string", "description": "Destination file (~ allowed). Parent folders are created."],
+            "path": ["type": "string", "description": "Destination file (~ allowed). Parent folders are created. For `audio`, the .srt takes the same name."],
             "overwrite": ["type": "boolean", "description": "Replace an existing file (default false)"],
         ].merging(rangeProperties) { a, _ in a }],
         run: { args in
             let segments: [Segment]
             let sessionStart: Date
             let meta: TranscriptExporter.Metadata
+            var record: SessionRecord?
             if let id = args["sessionId"] as? String {
-                guard let record = try? SessionStore.load(id: id) else { throw ToolError.notFound("No session with id \(id)") }
-                segments = record.segments.map(\.segment); sessionStart = record.startedAt; meta = record.metadata
+                guard let r = try? SessionStore.load(id: id) else { throw ToolError.notFound("No session with id \(id)") }
+                record = r
+                segments = r.segments.map(\.segment); sessionStart = r.startedAt; meta = r.metadata
             } else {
                 let s = try liveState()
                 segments = s.segments.map(\.segment); sessionStart = s.sessionStart
@@ -249,23 +251,43 @@ let tools: [Tool] = [
             let sl = try slice(segments, args: args, sessionStart: sessionStart)
             guard !sl.selected.isEmpty else { throw ToolError.invalidArgument("Nothing to export (empty transcript or range).") }
             let formatName = (args["format"] as? String) ?? "srt"
-            guard let format = TranscriptExporter.Format(rawValue: formatName) else { throw ToolError.invalidArgument("format must be srt, md or txt") }
+            let overwrite = (args["overwrite"] as? Bool) == true
+            let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSHomeDirectory())
+            func destination(defaultName: String) -> URL {
+                if let given = args["path"] as? String, !given.isEmpty {
+                    return URL(fileURLWithPath: NSString(string: given).expandingTildeInPath)
+                }
+                return downloads.appendingPathComponent(defaultName)
+            }
+            func checkFree(_ url: URL) throws {
+                if FileManager.default.fileExists(atPath: url.path), !overwrite {
+                    throw ToolError.invalidArgument("\(url.path) already exists; pass overwrite: true to replace it.")
+                }
+            }
+
+            if formatName == "audio" {
+                guard let record else { throw ToolError.invalidArgument("format audio needs a saved session (sessionId); stop dubbing first so the session is archived.") }
+                guard let audio = record.audioURL else { throw ToolError.notFound("Session \(record.id) has no recorded audio (Settings › General › Record the original audio).") }
+                let chosen = destination(defaultName: "\(record.exportBaseName()).\(MacDubPaths.audioExtension)")
+                let base = chosen.deletingPathExtension()
+                let audioDest = base.appendingPathExtension(MacDubPaths.audioExtension)
+                let srtDest = base.appendingPathExtension("srt")
+                try checkFree(audioDest); try checkFree(srtDest)
+                try FileManager.default.createDirectory(at: base.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if FileManager.default.fileExists(atPath: audioDest.path) { try FileManager.default.removeItem(at: audioDest) }
+                try FileManager.default.copyItem(at: audio, to: audioDest)
+                let srt = TranscriptExporter.render(sl.selected, format: .srt, content: content(args["content"] as? String ?? "translated"),
+                                                    sessionStart: sessionStart, metadata: meta)
+                try srt.write(to: srtDest, atomically: true, encoding: .utf8)
+                return "Wrote the original audio to \(audioDest.path) and \(sl.selected.count) subtitle cues to \(srtDest.path) (same name: players pick the subtitles up automatically)."
+            }
+
+            guard let format = TranscriptExporter.Format(rawValue: formatName) else { throw ToolError.invalidArgument("format must be srt, md, txt or audio") }
             let text = TranscriptExporter.render(sl.selected, format: format, content: content(args["content"] as? String),
                                                  sessionStart: sessionStart, metadata: meta)
-
-            let url: URL
-            if let given = args["path"] as? String, !given.isEmpty {
-                url = URL(fileURLWithPath: NSString(string: given).expandingTildeInPath)
-            } else {
-                let df = DateFormatter()
-                df.dateFormat = "yyyy-MM-dd HH.mm"
-                let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-                    ?? URL(fileURLWithPath: NSHomeDirectory())
-                url = downloads.appendingPathComponent("MacDub \(df.string(from: sessionStart)).\(format.fileExtension)")
-            }
-            if FileManager.default.fileExists(atPath: url.path), (args["overwrite"] as? Bool) != true {
-                throw ToolError.invalidArgument("\(url.path) already exists; pass overwrite: true to replace it.")
-            }
+            let url = destination(defaultName: "macdub-transcript-\(SessionRecord.exportStamp(sessionStart)).\(format.fileExtension)")
+            try checkFree(url)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try text.write(to: url, atomically: true, encoding: .utf8)
             return "Wrote \(sl.selected.count) sentences (\(format.rawValue)) to \(url.path)"
@@ -351,15 +373,44 @@ let tools: [Tool] = [
     ),
     Tool(
         name: "list_sessions",
-        description: "Saved dubbing sessions (newest first): id, app, start time, duration, languages, sentence count. Use get_session to read one.",
+        description: "Saved dubbing sessions (newest first): id, app, start time, duration, languages, sentence count and, when the original audio was recorded, audioPath (an .m4a on disk). Use get_session to read one.",
         schema: ["type": "object", "properties": ["limit": ["type": "integer", "minimum": 1, "description": "Max sessions (default 20)"]]],
         run: { args in
             let limit = (args["limit"] as? Int) ?? 20
             let list = SessionStore.list().prefix(limit).map { r -> [String: Any] in
                 ["id": r.id, "app": r.appName as Any, "startedAt": iso.string(from: r.startedAt), "durationSeconds": Int(r.duration),
-                 "sourceLocale": r.sourceLocale, "targetLanguage": r.targetLanguage, "sentences": r.sentenceCount]
+                 "sourceLocale": r.sourceLocale, "targetLanguage": r.targetLanguage, "sentences": r.sentenceCount,
+                 "audioPath": r.audioURL?.path as Any]
             }
             return list.isEmpty ? "No saved sessions." : jsonString(list)
+        }
+    ),
+    Tool(
+        name: "delete_session",
+        description: "Delete a saved session by id: its transcript and, if it was recorded, its original audio in ~/.macdub/audio. Cannot be undone.",
+        schema: ["type": "object", "required": ["id"], "properties": ["id": ["type": "string"]]],
+        run: { args in
+            guard let id = args["id"] as? String else { throw ToolError.invalidArgument("id is required") }
+            guard SessionStore.exists(id: id) else { throw ToolError.notFound("No session with id \(id)") }
+            try SessionStore.delete(id: id)
+            return "Deleted session \(id) (transcript and audio)."
+        }
+    ),
+    Tool(
+        name: "get_storage",
+        description: "How much disk MacDub uses: recorded session audio in ~/.macdub (bytes), saved transcripts in Application Support, and the number of sessions with/without audio. Use it before suggesting a clean-up with delete_session.",
+        schema: ["type": "object", "properties": [:]],
+        run: { _ in
+            let sessions = SessionStore.list()
+            let withAudio = sessions.filter { $0.audioURL != nil }.count
+            return jsonString([
+                "audioDirectory": MacDubPaths.dataDirectory.path,
+                "audioBytes": MacDubPaths.directorySize(MacDubPaths.dataDirectory),
+                "transcriptsDirectory": SessionStore.directory.path,
+                "transcriptBytes": MacDubPaths.directorySize(SessionStore.directory),
+                "sessions": sessions.count,
+                "sessionsWithAudio": withAudio,
+            ])
         }
     ),
     Tool(

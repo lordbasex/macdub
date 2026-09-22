@@ -47,9 +47,23 @@ final class StatusBarController: NSObject {
 
     private var appearanceObservation: NSKeyValueObservation?
 
+    /// What the button is showing right now, so it is not redrawn for nothing.
+    ///
+    /// This is not an optimisation, it breaks a LOOP. Writing `button.image` makes the status
+    /// item redraw itself; the redraw re-resolves `effectiveAppearance`; the KVO observer above
+    /// fires; it writes the image again. The app sat at ~105 % CPU doing nothing —
+    /// `NSStatusItem _updateReplicants` → `cacheDisplayInRect:` over and over on the main
+    /// thread — and macOS filed CPU-exhaustion reports. It is worse while dubbing because the
+    /// running icon takes the expensive branch that composes and draws the glyph.
+    private var lastRendered: (phase: AppState.Phase, appearance: NSAppearance.Name)?
+
     /// Idle: plain template glyph. Starting: amber dot. Running: green dot — "transcribing".
     private func updateIcon(phase: AppState.Phase) {
         guard let button = item.button else { return }
+        // The two things the drawing depends on. Same pair, same pixels: nothing to do.
+        let appearance = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) ?? .aqua
+        if let last = lastRendered, last.phase == phase, last.appearance == appearance { return }
+        lastRendered = (phase, appearance)
         let dot: NSColor?
         switch phase {
         case .idle, .stopping: dot = nil

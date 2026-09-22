@@ -1,7 +1,7 @@
 import Foundation
 
 /// A chunk of recognized speech, translated once the model answers.
-public struct Segment: Identifiable, Equatable {
+public struct Segment: Identifiable, Equatable, Sendable {
     public let id = UUID()
     public let original: String
     public var translated: String?

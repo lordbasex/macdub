@@ -63,6 +63,12 @@ final class AppState: ObservableObject {
     private let hotKeys = GlobalHotKeys()
     /// Last minutes of captured audio for MCP `get_audio_snippet`.
     private let ring = AudioRingBuffer(capacitySeconds: 120)
+    /// Writes the original audio of the session to ~/.macdub/audio for History playback/export.
+    private let recorder = SessionAudioRecorder()
+    /// Id of the session being dubbed (also the name of its audio file); new when the transcript is empty at Start.
+    private(set) var currentSessionID = UUID().uuidString
+    /// Bytes under ~/.macdub (recorded audio); refreshed by `refreshStorageSize()`.
+    @Published private(set) var storageSize: Int64?
     /// The MCP helper running in HTTP mode, when enabled in settings.
     private var mcpHTTPProcess: Process?
     @Published private(set) var mcpHTTPStatus: String?
@@ -79,6 +85,8 @@ final class AppState: ObservableObject {
 
     /// Set by `FloatingSubtitlesView` on appear/disappear.
     @Published var isSubtitleBarVisible = false
+    /// Section shown in the main window's sidebar.
+    @Published var section: AppSection = .dub
 
     /// Where the voice is right now, for karaoke-style highlighting.
     struct SpeakingPosition: Equatable {
@@ -114,6 +122,8 @@ final class AppState: ObservableObject {
         configureHotKeys()
         configureMCPHTTP()
         MCPInstaller.recordAppLocation()
+        MacDubPaths.migrateLegacyDirectory()
+        MacDubPaths.removeStrayPartFiles()
         sessions = SessionStore.list()
         Task { await bootstrap() }
     }
@@ -230,17 +240,58 @@ final class AppState: ObservableObject {
     func deleteSession(_ record: SessionRecord) {
         try? SessionStore.delete(id: record.id)
         refreshSessions()
+        refreshStorageSize()
     }
 
-    private func archiveCurrentSession() {
+    func deleteAllSessions() {
+        do { try SessionStore.deleteAll() } catch {
+            present(message: LF("Could not delete the sessions: %@", error.localizedDescription), suggestion: nil)
+        }
+        refreshSessions()
+        refreshStorageSize()
+    }
+
+    /// Size of ~/.macdub, computed off the main thread (it walks the directory).
+    func refreshStorageSize() {
+        let dir = MacDubPaths.dataDirectory
+        Task.detached(priority: .utility) {
+            let size = MacDubPaths.directorySize(dir)
+            await MainActor.run { self.storageSize = size }
+        }
+    }
+
+    /// Erases preferences, saved sessions, recorded audio and the live state, then relaunches
+    /// MacDub as if freshly installed. Registrations in Claude Code/Desktop/Codex are left alone:
+    /// they point at a launcher the app rewrites on its next start.
+    func factoryReset() async {
+        await stop()
+        stopMCPHTTP()
+        recorder.reset()
+        for dir in MacDubPaths.allDataDirectories { try? FileManager.default.removeItem(at: dir) }
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        }
+        UserDefaults.standard.synchronize()
+        Log.app.notice("Factory reset done; relaunching")
+        let relaunch = Process()
+        relaunch.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        relaunch.arguments = ["-n", Bundle.main.bundlePath]
+        try? relaunch.run()
+        NSApp.terminate(nil)
+    }
+
+    /// Saves the transcript (and the recorded audio, if any) under `currentSessionID`. A session
+    /// that is stopped and resumed is saved again under the same id, so History shows it once.
+    private func archiveCurrentSession(audioURL: URL?) {
         guard settings.saveSessions, !segments.isEmpty else { return }
-        let record = SessionRecord(startedAt: sessionStartedAt, appName: selectedTarget?.name,
+        let record = SessionRecord(id: currentSessionID, startedAt: sessionStartedAt, appName: selectedTarget?.name,
                                    appBundleIdentifier: selectedTarget?.bundleIdentifier,
                                    sourceLocale: settings.sourceLocaleID, targetLanguage: settings.targetLanguageID,
-                                   segments: segments)
+                                   segments: segments, audioFile: audioURL?.lastPathComponent)
         do {
             try SessionStore.save(record)
             refreshSessions()
+            refreshStorageSize()
         } catch {
             Log.app.error("Could not save session: \(error.localizedDescription, privacy: .public)")
         }
@@ -401,6 +452,10 @@ final class AppState: ObservableObject {
     }
 
     func refreshCapabilities() async {
+        // Ask for real this time: "is there an on-device model for this language?" is memoised
+        // because asking is an XPC call, and this is exactly where it must be forgotten — the
+        // user may have just downloaded a dictation language.
+        SFSpeechEngine.invalidateOnDeviceCache()
         capabilities.speechAuthorization = SpeechAndTranslationManager.authorizationStatus()
         capabilities.sourceOnDevice = SpeechAndTranslationManager.supportsOnDevice(settings.sourceLocale)
         capabilities.translationStatus = await TranslationCatalog.status(from: sourceLanguageForTranslation, to: settings.targetLanguage)
@@ -520,8 +575,14 @@ final class AppState: ObservableObject {
 
     func showHistory() {
         refreshSessions()
-        openWindowAction?.callAsFunction(id: HistoryView.windowID)
+        section = .history
+        showMainWindow()
+    }
+
+    /// Opens the Settings window (⌘,) from AppKit code paths (menu bar).
+    func showSettings() {
         NSApp.activate(ignoringOtherApps: true)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     func toggleSubtitleBar() {
@@ -543,9 +604,19 @@ final class AppState: ObservableObject {
         ])
     }
 
+    /// Empties the transcript and starts a new session: new id, new clock origin, new audio file.
+    /// While dubbing, the recording continues into the new file from this moment; the audio of
+    /// the discarded sentences is thrown away (unless it belongs to a session already archived).
     func clearTranscript() {
         segments.removeAll()
         partialText = ""
+        let previousID = currentSessionID
+        currentSessionID = UUID().uuidString
+        sessionStartedAt = Date()
+        recorder.discard(keepFinishedTake: SessionStore.exists(id: previousID))
+        if phase == .running, settings.saveSessions, settings.recordAudio {
+            recorder.begin(url: SessionStore.audioURL(for: currentSessionID), sessionStart: sessionStartedAt)
+        }
     }
 
     // MARK: Export
@@ -567,7 +638,7 @@ final class AppState: ObservableObject {
         guard !segments.isEmpty else { return }
         let panel = NSSavePanel()
         panel.title = L("Export Transcript")
-        panel.nameFieldStringValue = "MacDub \(exportDateFormatter.string(from: sessionStartedAt)).\(format.fileExtension)"
+        panel.nameFieldStringValue = "macdub-transcript-\(SessionRecord.exportStamp(sessionStartedAt)).\(format.fileExtension)"
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         NSApp.activate(ignoringOtherApps: true)
@@ -580,12 +651,6 @@ final class AppState: ObservableObject {
             present(message: LF("Could not save the file: %@", error.localizedDescription), suggestion: nil)
         }
     }
-
-    private let exportDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH.mm"
-        return f
-    }()
 
     // MARK: Start / stop
 
@@ -643,9 +708,21 @@ final class AppState: ObservableObject {
             // 5. Capture — last, so audio only flows once everything downstream is ready.
             ring.clear()
             let keepAudio = settings.audioBufferSeconds > 0
-            let sink: (AVAudioPCMBuffer) -> Void = { [speech, ring] buffer in
+            // An empty transcript means a new session: new id, new clock origin. Otherwise this is
+            // a resume and the recorder pads the gap with silence so cues and audio stay aligned.
+            if segments.isEmpty {
+                sessionStartedAt = Date()
+                currentSessionID = UUID().uuidString
+                recorder.reset()
+            }
+            let recording = settings.saveSessions && settings.recordAudio
+            if recording {
+                recorder.begin(url: SessionStore.audioURL(for: currentSessionID), sessionStart: sessionStartedAt)
+            }
+            let sink: (AVAudioPCMBuffer) -> Void = { [speech, ring, recorder] buffer in
                 speech.append(buffer)
                 if keepAudio { ring.append(buffer) }
+                if recording { recorder.append(buffer) }
             }
             notice = nil
             if settings.usesProcessTap {
@@ -668,7 +745,6 @@ final class AppState: ObservableObject {
 
             settings.lastTargetBundleID = target.bundleIdentifier
             latency = LatencyStats()
-            if segments.isEmpty { sessionStartedAt = Date() }
             startSilenceWatchdog()
             phase = .running
             Log.app.info("Pipeline running (\(self.activeEngine ?? "-", privacy: .public)): \(target.name, privacy: .public) \(self.settings.sourceLocaleID, privacy: .public) → \(self.settings.targetLanguageID, privacy: .public)")
@@ -700,7 +776,10 @@ final class AppState: ObservableObject {
         while segments.contains(where: { $0.translated == nil && !$0.failed }), Date() < deadline {
             try? await Task.sleep(for: .milliseconds(150))
         }
-        archiveCurrentSession()
+        let audioURL: URL? = await withCheckedContinuation { continuation in
+            recorder.finish { continuation.resume(returning: $0) }
+        }
+        archiveCurrentSession(audioURL: audioURL)
         phase = .idle
         Log.app.info("Pipeline stopped")
     }
@@ -868,7 +947,7 @@ final class AppState: ObservableObject {
         Log.app.error("\(message, privacy: .public)")
     }
 
-    private func present(message: String, suggestion: String?) {
+    func present(message: String, suggestion: String?) {
         errorMessage = message
         errorSuggestion = suggestion
     }

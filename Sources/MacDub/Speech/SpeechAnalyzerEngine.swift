@@ -148,7 +148,7 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         resultsTask?.cancel()
         resultsTask = nil
         let analyzer = self.analyzer
-        Task { try? await analyzer?.cancelAndFinishNow() }
+        Task { await analyzer?.cancelAndFinishNow() }
         self.analyzer = nil
         transcriber = nil
         lock.lock()

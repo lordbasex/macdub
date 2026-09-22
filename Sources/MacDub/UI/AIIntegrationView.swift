@@ -26,6 +26,8 @@ struct AIIntegrationSection: View {
                     HStack {
                         Button("Add to Claude Code") { run { try MCPInstaller.addToClaudeCode() } }
                         Button("Add to Claude Desktop") { run { try MCPInstaller.addToClaudeDesktop(); return L("Added. Restart Claude Desktop.") } }
+                    }
+                    HStack {
                         Button("Add to Codex") { run { try MCPInstaller.addToCodex(); return L("Added to ~/.codex/config.toml.") } }
                         Menu("Copy…") {
                             Button("Claude Code command") { copy(MCPInstaller.claudeCodeCommand) }
@@ -35,31 +37,10 @@ struct AIIntegrationSection: View {
                         }
                         .fixedSize()
                     }
-                    .controlSize(.small)
                 } else {
                     Text("Run the app from build/MacDub.app (make run) — the MCP helper is bundled by the build script.")
                         .font(.caption).foregroundStyle(.orange)
                 }
-                HStack {
-                    Toggle("Also serve over HTTP on port", isOn: state.settings.binding(\.mcpHTTPEnabled))
-                    TextField("", value: state.settings.binding(\.mcpHTTPPort), format: .number)
-                        .frame(width: 64)
-                        .disabled(state.settings.mcpHTTPEnabled)
-                    if let status = state.mcpHTTPStatus {
-                        Text(status).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                }
-                .controlSize(.small)
-                .help("Streamable HTTP transport at http://127.0.0.1:<port>/mcp (localhost only) for clients that cannot spawn a stdio server, or behind a tunnel for remote assistants.")
-                LabeledContent("Keep audio for snippets") {
-                    HStack {
-                        Slider(value: state.settings.binding(\.audioBufferSeconds), in: 0...120, step: 10)
-                        Text(state.settings.audioBufferSeconds == 0 ? L("off") : String(format: "%.0f s", state.settings.audioBufferSeconds))
-                            .monospacedDigit().frame(width: 44)
-                    }
-                }
-                .controlSize(.small)
-                .help("Seconds of captured audio kept in memory so an assistant can request get_audio_snippet. Never written to disk unless asked.")
             }
 
             // Summaries

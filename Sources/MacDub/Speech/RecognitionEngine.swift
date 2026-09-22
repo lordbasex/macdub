@@ -77,9 +77,44 @@ final class SFSpeechEngine: RecognitionEngine {
     private var generation = 0
     private let lock = NSLock()
 
+    /// Whether this Mac can recognise that language without the network.
+    ///
+    /// The answer is **memoised**, and that is the whole point: asking means building an
+    /// `SFSpeechRecognizer` and reading `supportsOnDeviceRecognition`, which is a *synchronous
+    /// XPC round-trip* to the speech daemon. The picker of spoken languages asked it once per
+    /// language inside a SwiftUI body, so every redraw fired one blocking call per language —
+    /// and while dubbing runs the body redraws many times a second (level meter, partials).
+    /// macOS filed CPU-exhaustion reports at 78 % average and the window froze.
+    ///
+    /// The cache can go stale in exactly one way: the person downloads a dictation language
+    /// while the app is open. `invalidateOnDeviceCache()` covers it and is called wherever the
+    /// app re-reads its capabilities.
     static func supportsOnDevice(_ locale: Locale) -> Bool {
-        SFSpeechRecognizer(locale: locale)?.supportsOnDeviceRecognition == true
+        let key = locale.identifier
+        onDeviceLock.lock()
+        if let known = onDeviceCache[key] {
+            onDeviceLock.unlock()
+            return known
+        }
+        onDeviceLock.unlock()
+
+        let answer = SFSpeechRecognizer(locale: locale)?.supportsOnDeviceRecognition == true
+
+        onDeviceLock.lock()
+        onDeviceCache[key] = answer
+        onDeviceLock.unlock()
+        return answer
     }
+
+    /// Forget what was asked, so a language downloaded just now is seen.
+    static func invalidateOnDeviceCache() {
+        onDeviceLock.lock()
+        onDeviceCache.removeAll()
+        onDeviceLock.unlock()
+    }
+
+    private static var onDeviceCache: [String: Bool] = [:]
+    private static let onDeviceLock = NSLock()
 
     func start(locale: Locale) throws {
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {

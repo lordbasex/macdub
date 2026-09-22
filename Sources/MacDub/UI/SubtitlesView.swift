@@ -36,7 +36,7 @@ struct SubtitlesView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            Divider()
+            Divider().overlay(Color.white.opacity(0.08))
 
             if isEmpty {
                 // The empty state is NOT a row of the transcript, so it does not belong inside

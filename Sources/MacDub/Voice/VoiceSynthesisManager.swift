@@ -123,6 +123,17 @@ final class VoiceSynthesisManager: NSObject {
         notifyBacklog()
     }
 
+    /// Holds the current utterance (History playback paused). `resume()` continues it.
+    func pause() {
+        guard synthesizer.isSpeaking, !synthesizer.isPaused else { return }
+        synthesizer.pauseSpeaking(at: .word)
+    }
+
+    func resume() {
+        guard synthesizer.isPaused else { return }
+        synthesizer.continueSpeaking()
+    }
+
     func stop() {
         synthesizer.stopSpeaking(at: .immediate)
         queued.removeAll()

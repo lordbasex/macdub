@@ -9,9 +9,11 @@ struct MacDubApp: App {
         Window("MacDub", id: AppState.mainWindowID) {
             ContentView()
                 .environmentObject(state)
-                .frame(minWidth: 460, minHeight: 620)
+                .frame(minWidth: 1040, minHeight: 700)
         }
+        .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
+        .defaultSize(width: 1120, height: 760)
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .appInfo) {
@@ -40,11 +42,11 @@ struct MacDubApp: App {
             }
         }
 
-        Window("History", id: HistoryView.windowID) {
-            HistoryView()
+        // Standard macOS preferences window (⌘,), with a toolbar of categories.
+        SwiftUI.Settings { // our `Settings` model type shadows the scene name
+            SettingsView()
                 .environmentObject(state)
         }
-        .defaultSize(width: 900, height: 560)
 
         // Always-on-top subtitle pill you can drop over the video you are watching.
         Window("Subtitle Bar", id: FloatingSubtitlesView.windowID) {

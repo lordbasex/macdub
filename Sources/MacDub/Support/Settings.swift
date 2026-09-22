@@ -45,6 +45,15 @@ final class Settings: ObservableObject {
     @Published var globalHotKeys: Bool { didSet { defaults.set(globalHotKeys, forKey: "globalHotKeys") } }
     /// Persist each session's transcript to disk when dubbing stops.
     @Published var saveSessions: Bool { didSet { defaults.set(saveSessions, forKey: "saveSessions") } }
+    /// Record the captured (original) audio of each session to ~/.macdub/audio for playback/export.
+    @Published var recordAudio: Bool { didSet { defaults.set(recordAudio, forKey: "recordAudio") } }
+    /// History playback: "original" (recorded audio only), "documentary" (original lowered under the
+    /// translated voice) or "voice" (translated voice only). Remembered across sessions.
+    @Published var historyAudioMode: String { didSet { defaults.set(historyAudioMode, forKey: "historyAudioMode") } }
+    /// History playback subtitles: "original", "translation" or "both".
+    @Published var historySubtitleMode: String { didSet { defaults.set(historySubtitleMode, forKey: "historySubtitleMode") } }
+    /// Level (0…1) of the original audio under the voice in documentary mode.
+    @Published var historyOriginalVolume: Double { didSet { defaults.set(historyOriginalVolume, forKey: "historyOriginalVolume") } }
     /// Seconds of captured audio kept in memory for MCP `get_audio_snippet` (0 = keep none).
     @Published var audioBufferSeconds: Double { didSet { defaults.set(audioBufferSeconds, forKey: "audioBufferSeconds") } }
     /// Also serve the MCP server over HTTP (Streamable HTTP transport) on `mcpHTTPPort`.
@@ -87,6 +96,10 @@ final class Settings: ObservableObject {
         stopOnSilence = defaults.object(forKey: "stopOnSilence") as? Bool ?? false
         globalHotKeys = defaults.object(forKey: "globalHotKeys") as? Bool ?? true
         saveSessions = defaults.object(forKey: "saveSessions") as? Bool ?? true
+        recordAudio = defaults.object(forKey: "recordAudio") as? Bool ?? true
+        historyAudioMode = defaults.string(forKey: "historyAudioMode") ?? "original"
+        historySubtitleMode = defaults.string(forKey: "historySubtitleMode") ?? "both"
+        historyOriginalVolume = defaults.object(forKey: "historyOriginalVolume") as? Double ?? 0.2
         audioBufferSeconds = defaults.object(forKey: "audioBufferSeconds") as? Double ?? 60
         mcpHTTPEnabled = defaults.object(forKey: "mcpHTTPEnabled") as? Bool ?? false
         mcpHTTPPort = defaults.object(forKey: "mcpHTTPPort") as? Int ?? 8765
