@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  build:
+    name: Build, test, package (universal)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app || sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | tail -1)"
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Type-check
+        run: swift build
+
+      - name: Unit tests
+        run: swift run macdub-tests
+
+      - name: Universal .app (ad-hoc signed)
+        run: CODESIGN_IDENTITY=- ./scripts/build-app.sh
+
+      - name: Zip
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="dev-${GITHUB_SHA::7}"
+          ditto -c -k --keepParent build/MacDub.app "build/MacDub-$VERSION.zip"
+          shasum -a 256 "build/MacDub-$VERSION.zip" | tee "build/MacDub-$VERSION.zip.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MacDub-universal
+          path: |
+            build/MacDub-*.zip
+            build/MacDub-*.zip.sha256
+
+      # Tagged builds become a draft release; sign + notarize locally with scripts/release.sh
+      # before publishing, or add Developer ID secrets here later.
+      - name: Draft GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            build/MacDub-*.zip
+            build/MacDub-*.zip.sha256

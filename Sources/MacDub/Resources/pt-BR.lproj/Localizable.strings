@@ -1,0 +1,257 @@
+/* MacDub — Portuguese (Brazil). Keys are the English text. To add a language: copy this folder as
+   <code>.lproj, translate the values and add a case to InterfaceLanguage. */
+
+/* Main window · Source */
+"Source" = "Fonte";
+"Application" = "Aplicativo";
+"Choose…" = "Escolher…";
+"Refresh running applications" = "Atualizar a lista de aplicativos abertos";
+"Entire system (all apps)" = "Todo o sistema (todos os apps)";
+"One app (Zoom, Teams, VLC, a browser…) or the entire system audio. The microphone is never captured." = "Um app (Zoom, Teams, VLC, um navegador…) ou todo o áudio do sistema. O microfone nunca é capturado.";
+"Spoken language" = "Idioma falado";
+"needs download" = "requer download";
+"No on-device model for this language. Add it under Keyboard › Dictation." = "Não há modelo local para este idioma. Adicione-o em Teclado › Ditado.";
+"Open Dictation Settings" = "Abrir ajustes de Ditado";
+
+/* Original audio */
+"Original audio" = "Áudio original";
+"Capture engine" = "Motor de captura";
+"Core Audio tap · can lower the original" = "Core Audio tap · permite abaixar o original";
+"ScreenCaptureKit · original untouched" = "ScreenCaptureKit · original sem alteração";
+"How loud the video's own audio stays under the translated voice." = "Volume em que o áudio original fica sob a voz traduzida.";
+"Only lower it while the voice is speaking" = "Abaixar apenas enquanto a voz fala";
+"Fell back to ScreenCaptureKit for this session." = "ScreenCaptureKit foi usado nesta sessão.";
+"The tap needs the app to be playing audio when you press Start." = "O tap precisa que o app esteja reproduzindo áudio ao pressionar Iniciar.";
+"Original audio can't be lowered: %@ Using ScreenCaptureKit." = "Não é possível abaixar o áudio original: %@ Usando ScreenCaptureKit.";
+
+/* Translation */
+"Translation" = "Tradução";
+"Translate to" = "Traduzir para";
+"Model installed · offline" = "Modelo instalado · offline";
+"Model not downloaded yet (one-time download)." = "Modelo ainda não baixado (download único).";
+"Prepare translation" = "Preparar tradução";
+"This language pair is not supported." = "Este par de idiomas não é suportado.";
+"Checking…" = "Verificando…";
+"session ready" = "sessão pronta";
+
+/* Voice */
+"Voice" = "Voz";
+"Speak the translation" = "Ler a tradução em voz alta";
+"Speak translation" = "Ler tradução";
+"System voice" = "Voz do sistema";
+"No voice installed for this language" = "Nenhuma voz instalada para este idioma";
+"Reload the voice list after downloading voices in System Settings" = "Recarregar a lista após baixar vozes nos Ajustes do Sistema";
+"🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here." = "🟢 Premium · 🟡 Aprimorada · ⚪ Compacta · ⚫ Novidade. Baixe vozes Aprimoradas/Premium nos Ajustes do Sistema; as vozes da Siri são reservadas pela Apple e nunca aparecem aqui.";
+"Rate" = "Velocidade";
+"Volume" = "Volume";
+"Skip backlog beyond %lld sentences" = "Pular a fila a partir de %lld frases";
+"When the dub falls this many sentences behind, older ones are dropped to catch up." = "Quando a dublagem atrasa este número de frases, as mais antigas são descartadas para alcançar o vídeo.";
+"Max delay" = "Atraso máximo";
+"Catch-up speed-up" = "Aceleração ao atrasar";
+"off" = "não";
+"How much faster each sentence is read per sentence still waiting in the queue. 0 keeps the voice at a constant speed; the queue is then trimmed by Max delay instead." = "Quanto mais rápido cada frase é lida por frase ainda na fila. Em 0 a voz mantém velocidade constante e a fila é cortada pelo Atraso máximo.";
+"Sentences older than this are shown as subtitles but not spoken when the voice is behind." = "Frases mais antigas que este tempo aparecem como legenda mas não são lidas se a voz estiver atrasada.";
+"Test voice" = "Testar voz";
+"Manage voices…" = "Gerenciar vozes…";
+"Download higher quality voices in System Settings › Accessibility › Spoken Content" = "Baixe vozes de maior qualidade em Ajustes › Acessibilidade › Conteúdo Falado";
+
+/* Subtitles */
+"Subtitles" = "Legendas";
+"Show subtitles panel" = "Mostrar painel de legendas";
+"Include original text" = "Incluir texto original";
+"Show original text" = "Mostrar texto original";
+"Highlight the words being spoken" = "Destacar as palavras que estão sendo ditas";
+"Highlight spoken words" = "Destacar palavras faladas";
+"Hide subtitle bar" = "Ocultar barra de legendas";
+"Show subtitle bar" = "Mostrar barra de legendas";
+"Floating pill with the last translated lines, Stop and quick settings (⌘B)" = "Pílula flutuante com as últimas frases traduzidas, Parar e ajustes rápidos (⌘B)";
+"Auto-scroll" = "Rolagem automática";
+"Clear" = "Limpar";
+"Listening…" = "Ouvindo…";
+"Nothing yet" = "Nada ainda";
+"Play something in %@." = "Reproduza algo em %@.";
+"the captured app" = "o app capturado";
+"Press Start dubbing to begin." = "Pressione Iniciar dublagem para começar.";
+"Not spoken: the voice was too far behind" = "Não lida: a voz estava muito atrasada";
+"Seconds after the sentence was recognized: translation returned / voice started" = "Segundos desde o reconhecimento da frase: tradução pronta / voz iniciada";
+"Translation failed" = "Falha na tradução";
+"translating…" = "traduzindo…";
+
+/* Floating pill */
+"Drag to move" = "Arraste para mover";
+"MacDub — press ▶ to start dubbing" = "MacDub — pressione ▶ para começar a dublar";
+"Sentences waiting to be spoken" = "Frases aguardando leitura";
+"Stop dubbing" = "Parar dublagem";
+"Start dubbing" = "Iniciar dublagem";
+"Quick settings" = "Ajustes rápidos";
+"Hide subtitle bar (menu bar icon brings it back)" = "Ocultar barra de legendas (o ícone da barra de menus a traz de volta)";
+"Only lower while speaking" = "Abaixar apenas enquanto fala";
+"Lines: %lld" = "Linhas: %lld";
+"Width" = "Largura";
+"Text size" = "Tamanho do texto";
+"Skip backlog" = "Pular fila";
+"Open MacDub…" = "Abrir MacDub…";
+
+/* Recognition engine, silence, shortcuts, history */
+"Recognition engine" = "Motor de reconhecimento";
+"Automatic · SpeechAnalyzer (macOS 26)" = "Automático · SpeechAnalyzer (macOS 26)";
+"Automatic · SFSpeechRecognizer (SpeechAnalyzer needs macOS 26)" = "Automático · SFSpeechRecognizer (SpeechAnalyzer requer macOS 26)";
+"Automatic uses SpeechAnalyzer on macOS 26 (better punctuation, lower latency) and falls back to SFSpeechRecognizer otherwise or if it fails." = "Automático usa SpeechAnalyzer no macOS 26 (melhor pontuação, menos atraso) e volta ao SFSpeechRecognizer se não existir ou falhar.";
+"Running: SpeechAnalyzer" = "Em uso: SpeechAnalyzer";
+"Running: SFSpeechRecognizer" = "Em uso: SFSpeechRecognizer";
+"SpeechAnalyzer failed; switched to SFSpeechRecognizer for this session." = "SpeechAnalyzer falhou; mudou para SFSpeechRecognizer nesta sessão.";
+"Silence watchdog" = "Vigia de silêncio";
+"After this long without sound from the captured app, MacDub shows a notice (or stops, below)." = "Após este tempo sem som do app capturado, o MacDub avisa (ou para, abaixo).";
+"Stop dubbing when the app goes silent" = "Parar a dublagem quando o app ficar em silêncio";
+"No audio for %lld s" = "Sem áudio há %lld s";
+"%@ has been silent for %lld s." = "%@ está em silêncio há %lld s.";
+"Stopped: %@ has been silent for %lld s." = "Parado: %@ ficou %lld s em silêncio.";
+"the app" = "o app";
+"Global shortcuts: ⌃⌥D start/stop · ⌃⌥S subtitle bar" = "Atalhos globais: ⌃⌥D iniciar/parar · ⌃⌥S barra de legendas";
+"Save sessions to History (⌘Y)" = "Salvar sessões no Histórico (⌘Y)";
+"Session History…" = "Histórico de sessões…";
+"History" = "Histórico";
+"No sessions yet" = "Ainda não há sessões";
+"Each dubbing session is saved here when it stops." = "Cada sessão de dublagem é salva aqui ao parar.";
+"Select a session" = "Selecione uma sessão";
+"Refresh" = "Atualizar";
+"Delete" = "Excluir";
+"%lld sentences · %@ → %@ · %@" = "%lld frases · %@ → %@ · %@";
+
+/* Advanced / Permissions / Interface */
+"Advanced" = "Avançado";
+"Silence cut-off" = "Corte por silêncio";
+"How long to wait after the speaker pauses before translating the pending words." = "Quanto esperar após uma pausa do orador antes de traduzir as palavras pendentes.";
+"Permissions" = "Permissões";
+"Screen & System Audio Recording" = "Gravação de tela e áudio do sistema";
+"Speech Recognition" = "Reconhecimento de fala";
+"Request" = "Solicitar";
+"Open Settings" = "Abrir Ajustes";
+"After enabling Screen Recording, quit and relaunch MacDub." = "Após ativar a Gravação de tela, feche e abra o MacDub novamente.";
+"Interface" = "Interface";
+"Language" = "Idioma";
+"System language" = "Idioma do sistema";
+"Takes effect after relaunching MacDub. Translations live in Sources/MacDub/Resources — contributions welcome." = "Aplica-se ao reabrir o MacDub. As traduções ficam em Sources/MacDub/Resources — contribuições são bem-vindas.";
+
+/* Footer / status */
+"Stop" = "Parar";
+"Start" = "Iniciar";
+"Idle" = "Parado";
+"Starting…" = "Iniciando…";
+"Stopping…" = "Parando…";
+"Speaking: %@" = "Dizendo: %@";
+"Listening to %@" = "Ouvindo %@";
+"app" = "o app";
+"delay %.1f s · avg %.1f s · translate %.1f s" = "atraso %.1f s · média %.1f s · tradução %.1f s";
+"Seconds from the end of the original sentence to the voice starting it (last / mean of last 10 / translation share)." = "Segundos do fim da frase original até a voz começar (última / média das 10 últimas / parte da tradução).";
+"queue %lld" = "fila %lld";
+"Skip" = "Pular";
+"delay %.1f s" = "atraso %.1f s";
+"Ready · %@" = "Pronto · %@";
+"Ready" = "Pronto";
+"Dubbing %@ · %@ → %@" = "Dublando %@ · %@ → %@";
+"Subtitles will appear here." = "As legendas aparecerão aqui.";
+"Subtitle bar" = "Barra de legendas";
+"Original audio level under the dub" = "Nível do áudio original sob a dublagem";
+"Version %@" = "Versão %@";
+"Settings…" = "Ajustes…";
+"About" = "Sobre";
+"Quit" = "Sair";
+"Choose an application to capture first." = "Escolha primeiro um aplicativo para capturar.";
+
+/* Export */
+"Export" = "Exportar";
+"Export Transcript" = "Exportar transcrição";
+"Export Subtitles (.srt)…" = "Exportar legendas (.srt)…";
+"Subtitles (.srt) — translation" = "Legendas (.srt) — tradução";
+"Subtitles (.srt) — original" = "Legendas (.srt) — original";
+"Subtitles (.srt) — both" = "Legendas (.srt) — ambos";
+"Text (.txt) — both" = "Texto (.txt) — ambos";
+"Could not save the file: %@" = "Não foi possível salvar o arquivo: %@";
+
+"Markdown (.md) — for AI summaries" = "Markdown (.md) — para resumos com IA";
+"Export Markdown (.md)…" = "Exportar Markdown (.md)…";
+
+/* AI assistants & MCP */
+"AI assistants & MCP" = "Assistentes de IA e MCP";
+"MCP server: lets Claude Code, Claude Desktop, Codex or any MCP client read the live transcript and control dubbing." = "Servidor MCP: permite que Claude Code, Claude Desktop, Codex ou qualquer cliente MCP leia a transcrição ao vivo e controle a dublagem.";
+"Add to Claude Code" = "Adicionar ao Claude Code";
+"Add to Claude Desktop" = "Adicionar ao Claude Desktop";
+"Add to Codex" = "Adicionar ao Codex";
+"Copy…" = "Copiar…";
+"Claude Code command" = "Comando para Claude Code";
+"JSON (Claude Desktop, Cursor, VS Code…)" = "JSON (Claude Desktop, Cursor, VS Code…)";
+"TOML (Codex)" = "TOML (Codex)";
+"Server path" = "Caminho do servidor";
+"Run the app from build/MacDub.app (make run) — the MCP helper is bundled by the build script." = "Execute o app a partir de build/MacDub.app (make run): o script de build inclui o auxiliar MCP.";
+"Added. Restart Claude Desktop." = "Adicionado. Reinicie o Claude Desktop.";
+"Added to ~/.codex/config.toml." = "Adicionado a ~/.codex/config.toml.";
+"Also serve over HTTP on port" = "Servir também por HTTP na porta";
+"Serving http://127.0.0.1:%lld/mcp" = "Servindo http://127.0.0.1:%lld/mcp";
+"MCP HTTP server stopped (exit %lld)." = "Servidor MCP HTTP parado (código %lld).";
+"MCP helper not bundled (run from build/MacDub.app)." = "Auxiliar MCP não incluído (execute a partir de build/MacDub.app).";
+"Keep audio for snippets" = "Manter áudio para trechos";
+"No audio has been captured yet." = "Nenhum áudio foi capturado ainda.";
+"Summarize with" = "Resumir com";
+"Detecting…" = "Detectando…";
+"No assistant found" = "Nenhum assistente encontrado";
+"Detect installed assistants again (Claude Code, Codex, Ollama, LM Studio, Claude Desktop, ChatGPT)" = "Detectar novamente os assistentes instalados (Claude Code, Codex, Ollama, LM Studio, Claude Desktop, ChatGPT)";
+"Model" = "Modelo";
+"Summarize transcript" = "Resumir transcrição";
+"Show last summary" = "Ver último resumo";
+"Summary" = "Resumo";
+"Copy" = "Copiar";
+"Save…" = "Salvar…";
+"Close" = "Fechar";
+"Done." = "Feito.";
+"Copied." = "Copiado.";
+"That assistant is not installed." = "Esse assistente não está instalado.";
+"The prompt and transcript were copied to the clipboard — paste them (⌘V) into the assistant that just opened." = "O prompt e a transcrição foram copiados para a área de transferência: cole-os (⌘V) no assistente que acabou de abrir.";
+
+/* Menu bar mode */
+"Hide Dock icon (menu bar only)" = "Ocultar ícone do Dock (apenas barra de menus)";
+"MacDub keeps running in the menu bar; use its icon or ⌘, from the pill to come back." = "O MacDub continua na barra de menus; use o ícone ou ⌘, na pílula para voltar.";
+"Open at login" = "Abrir ao iniciar sessão";
+"Start dubbing when the app starts playing audio" = "Iniciar a dublagem quando o app começar a reproduzir áudio";
+"Watches the selected application while MacDub is idle and starts automatically." = "Observa o aplicativo escolhido enquanto o MacDub está parado e inicia sozinho.";
+"Open System Settings › General › Login Items and allow MacDub." = "Abra Ajustes › Geral › Itens de Início e permita o MacDub.";
+
+/* Menus */
+"Dubbing" = "Dublagem";
+"Skip Speech Backlog" = "Pular fila de voz";
+"Clear Transcript" = "Limpar transcrição";
+"About MacDub" = "Sobre o MacDub";
+"Stop Dubbing" = "Parar dublagem";
+"Start Dubbing" = "Iniciar dublagem";
+"Hide Subtitle Bar" = "Ocultar barra de legendas";
+"Show Subtitle Bar" = "Mostrar barra de legendas";
+"MacDub Settings…" = "Ajustes do MacDub…";
+"Quit MacDub" = "Sair do MacDub";
+"MacDub — click for status, right-click for options" = "MacDub — clique para ver o estado, clique direito para opções";
+"MacDub is dubbing — click for status" = "O MacDub está dublando — clique para ver o estado";
+"Real-time, fully offline dubbing for macOS." = "Dublagem em tempo real, totalmente offline, para macOS.";
+
+/* Errors */
+"Screen Recording permission is required to capture application audio." = "A permissão de Gravação de tela é necessária para capturar o áudio do aplicativo.";
+"Speech Recognition permission was denied." = "A permissão de Reconhecimento de fala foi negada.";
+"Speech Recognition is restricted on this Mac." = "O Reconhecimento de fala está restrito neste Mac.";
+"Speech recognition does not support the language “%@”." = "O reconhecimento de fala não suporta o idioma “%@”.";
+"On-device speech recognition is not available for “%@”." = "O reconhecimento de fala local não está disponível para “%@”.";
+"The speech recognizer for “%@” is temporarily unavailable." = "O reconhecedor de fala para “%@” está temporariamente indisponível.";
+"“%@” is no longer running." = "“%@” não está mais em execução.";
+"No display found to attach the capture stream to." = "Nenhuma tela encontrada para associar a captura.";
+"Translation from “%@” to “%@” is not supported." = "A tradução de “%@” para “%@” não é suportada.";
+"The translation model is not ready yet." = "O modelo de tradução ainda não está pronto.";
+"Translation failed: %@" = "Falha na tradução: %@";
+"No system voice installed for “%@”." = "Nenhuma voz do sistema instalada para “%@”.";
+"Audio capture stopped: %@" = "A captura de áudio parou: %@";
+"“%@” has not produced any audio yet." = "“%@” ainda não produziu áudio.";
+"Could not tap the application's audio: %@" = "Não foi possível interceptar o áudio do aplicativo: %@";
+"Open System Settings › Privacy & Security › Screen & System Audio Recording and enable MacDub, then relaunch the app." = "Abra Ajustes › Privacidade e Segurança › Gravação de tela e áudio do sistema, ative o MacDub e reabra o app.";
+"Open System Settings › Privacy & Security › Speech Recognition and enable MacDub." = "Abra Ajustes › Privacidade e Segurança › Reconhecimento de fala e ative o MacDub.";
+"Open System Settings › Keyboard › Dictation and add the language so macOS downloads the on-device model." = "Abra Ajustes › Teclado › Ditado e adicione o idioma para que o macOS baixe o modelo local.";
+"Pick a different language pair." = "Escolha outro par de idiomas.";
+"Press “Prepare translation” and accept the model download (one time, requires internet)." = "Pressione “Preparar tradução” e aceite o download do modelo (uma única vez, requer internet).";
+"Open System Settings › Accessibility › Spoken Content › System Voice › Manage Voices and download a voice." = "Abra Ajustes › Acessibilidade › Conteúdo Falado › Voz do Sistema › Gerenciar Vozes e baixe uma voz.";
+"Play something in that app first, then press Start — or switch the capture engine to ScreenCaptureKit." = "Reproduza algo nesse app primeiro e pressione Iniciar — ou mude o motor de captura para ScreenCaptureKit.";
+"Switch the capture engine to ScreenCaptureKit (the original audio can't be lowered in that mode)." = "Mude o motor de captura para ScreenCaptureKit (nesse modo o áudio original não pode ser abaixado).";
