@@ -31,7 +31,9 @@ if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
   fi
 fi
 BUNDLE_ID="${BUNDLE_ID:-com.lordbasex.MacDub}"
-VERSION="${VERSION:-0.1.0}"
+# Default: the latest release tag (v0.3.1 → 0.3.1), so local builds don't claim an old version.
+VERSION="${VERSION:-$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')}"
+VERSION="${VERSION:-0.0.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 BUILD_DIR="$ROOT/build"
 APP="$BUILD_DIR/$APP_NAME.app"
