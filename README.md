@@ -39,7 +39,7 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 | | ScreenCaptureKit fallback | Used automatically when the app has no audio process yet (no background mix in that mode). |
 | | Audio buffer for snippets | The last 60 s (configurable in *Settings › AI & MCP*, 0 = off) stay in memory so an assistant can request a WAV excerpt through MCP; never written to disk unless asked. |
 | **Recognition** | On-device speech recognition | `SFSpeechRecognizer` with on-device models (macOS 15+). |
-| | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. MacDub translates and speaks its *finalized* results — whole, corrected, punctuated sentences (93 % of sentences in one piece in the [benchmark](docs/benchmarks/), against 35 % segmenting its volatile results) — and shows the volatile text live. The engine can be picked in *Settings › Capture › Engine*, which also says which one was detected and which one is running. |
+| | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. MacDub translates and speaks its *finalized* results — whole, corrected, punctuated sentences (85–92 % of sentences in one piece in the [benchmark](docs/benchmarks/), against 35 % segmenting its volatile results) — and shows the volatile text live. The engine can be picked in *Settings › Capture › Engine*, which also says which one was detected and which one is running. |
 | | Smart sentence segmentation | Cuts on punctuation, clause marks, length, pending time and silence; re-anchors when the recognizer rewrites earlier words. Unit-tested. |
 | **Translation** | On-device translation | Apple's `Translation` framework, 21 languages, models downloaded once. |
 | **Voice** | System voices with quality badges | 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ novelty; per-voice rate and volume; one-click reload after downloading voices. (Siri voices are not available to third-party apps.) |
@@ -67,7 +67,7 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 
 ## Install
 
-### Homebrew (once the first release is published)
+### Homebrew
 
 ```bash
 brew tap lordbasex/macdub https://github.com/lordbasex/macdub
@@ -221,12 +221,14 @@ MacDub's two speech engines were benchmarked on the same audio through the real 
 
 | | SpeechAnalyzer (macOS 26) | SFSpeechRecognizer |
 |---|---|---|
-| Sentences spoken whole (one segment) | **92 %** | 49 % |
-| Word error rate | **9.7 %** | 31.6 % |
-| Sentence ends found (recall) | **91 %** | 25 % |
+| Sentences spoken whole (one segment) | **85 %** | 49 % |
+| Word error rate | **9.8 %** | 31.6 % |
+| Sentence ends found (recall) | **90 %** | 25 % |
 | Questions ending in `?` | **19/26** | 5/22 |
-| Latency, median · p90 | 2.3 s · 4.1 s | 1.1 s · 3.1 s |
+| Latency, median · p90 · max | 2.3 s · 4.1 s · 12.4 s | 1.1 s · 3.1 s · 7.1 s |
 | Speech service CPU (avg) | **5.4 %** | 22.7 % |
+
+SpeechAnalyzer waits for its finalized, corrected sentences; after 10 s without one it speaks what it has up to the last comma, trading a few whole sentences (92 → 85 %) for no long silences ([details](docs/benchmarks/2026-09-23-apple-m1.md#update-latency-cap-macdub-031)).
 
 Run it on your Mac — especially M2, M3, M4, M5 and M6, which haven't been measured yet — and send the report as a pull request:
 
@@ -262,7 +264,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - Latency of roughly 1–3 s is inherent to sentence-by-sentence dubbing.
 - On-device speech languages are limited to those with a downloaded Dictation model (usually the system language plus en-US).
 - `SFSpeechRecognizer` punctuates poorly for fast talkers; on macOS 26 `SpeechAnalyzer` is used instead when available.
-- With `SpeechAnalyzer` a sentence is spoken once it is complete — about 2.3 s after it ends (median), a little later than `SFSpeechRecognizer`'s fragments, in exchange for whole sentences.
+- With `SpeechAnalyzer` a sentence is spoken once it is complete — about 2.3 s after it ends (median), a little later than `SFSpeechRecognizer`'s fragments, in exchange for whole sentences. When SpeechAnalyzer holds a sentence back (it sometimes merges two), MacDub speaks it after at most ~10–12 s.
 - Safari plays audio through shared WebKit XPC processes; tapping Safari can affect other WebKit apps.
 - No speaker diarization: everyone gets the same voice (the data model has a `speaker` field ready for it).
 - Siri voices cannot be used by third-party apps.

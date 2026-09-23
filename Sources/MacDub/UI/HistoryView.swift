@@ -23,6 +23,7 @@ struct HistorySectionView: View {
                 }
                 Spacer()
                 Button { state.refreshSessions() } label: { Image(systemName: "arrow.clockwise") }
+                    .iconButtonHelp("Refresh")
                     .buttonStyle(.borderless).foregroundStyle(.white)
                 if let record = selected {
                     Menu {

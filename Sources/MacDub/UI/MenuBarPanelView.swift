@@ -140,7 +140,7 @@ struct MenuBarPanelView: View {
     private var bottomBar: some View {
         HStack {
             Button { dismiss(); state.showHistory() } label: { Image(systemName: "clock.arrow.circlepath") }
-                .buttonStyle(.plain).foregroundStyle(Theme.secondaryText).help("Session History…")
+                .buttonStyle(.plain).foregroundStyle(Theme.secondaryText).iconButtonHelp("Session History…")
             Spacer()
             Button { dismiss(); state.showMainWindow() } label: {
                 Text("Open MacDub").font(.subheadline.weight(.medium)).foregroundStyle(.white)
@@ -148,7 +148,7 @@ struct MenuBarPanelView: View {
             .buttonStyle(.plain)
             Spacer()
             Button { dismiss(); state.showSettings() } label: { Image(systemName: "gearshape.fill") }
-                .buttonStyle(.plain).foregroundStyle(Theme.secondaryText).help("Settings…")
+                .buttonStyle(.plain).foregroundStyle(Theme.secondaryText).iconButtonHelp("Settings…")
         }
         .padding(.top, 2)
     }

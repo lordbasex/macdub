@@ -34,7 +34,9 @@ public struct SessionRecord: Codable, Identifiable, Equatable {
 
     /// Where the recorded audio is, or nil when there is none on disk.
     public var audioURL: URL? {
-        guard let audioFile else { return nil }
+        // A plain file name only: a session file edited to say "../../x" must not reach outside
+        // the audio folder (delete and export act on this URL).
+        guard let audioFile, SessionStore.isPlainFileName(audioFile) else { return nil }
         let url = MacDubPaths.audioDirectory.appendingPathComponent(audioFile)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
@@ -141,6 +143,22 @@ public enum SessionStore {
         return d
     }()
 
+    /// Session ids are UUIDs. Ids arrive from MCP clients too, so anything else — "../../Claude/
+    /// claude_desktop_config" would have deleted another app's settings — is refused before it
+    /// becomes a path.
+    public static func isValidID(_ id: String) -> Bool {
+        !id.isEmpty && id.count <= 64 && id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
+    }
+
+    static func isPlainFileName(_ name: String) -> Bool {
+        !name.isEmpty && !name.hasPrefix(".") && !name.contains("/") && !name.contains("\\") && !name.contains("..")
+    }
+
+    private static func checked(_ id: String) throws -> String {
+        guard isValidID(id) else { throw CocoaError(.fileReadInvalidFileName, userInfo: [NSFilePathErrorKey: id]) }
+        return id
+    }
+
     private static func url(for id: String) -> URL {
         directory.appendingPathComponent(id).appendingPathExtension("json")
     }
@@ -152,17 +170,18 @@ public enum SessionStore {
 
     public static func save(_ record: SessionRecord) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try encoder.encode(record).write(to: url(for: record.id), options: .atomic)
+        try encoder.encode(record).write(to: url(for: checked(record.id)), options: .atomic)
     }
 
-    public static func exists(id: String) -> Bool { FileManager.default.fileExists(atPath: url(for: id).path) }
+    public static func exists(id: String) -> Bool { isValidID(id) && FileManager.default.fileExists(atPath: url(for: id).path) }
 
     public static func load(id: String) throws -> SessionRecord {
-        try decoder.decode(SessionRecord.self, from: Data(contentsOf: url(for: id)))
+        try decoder.decode(SessionRecord.self, from: Data(contentsOf: url(for: checked(id))))
     }
 
     /// Removes the transcript and its recorded audio (if any).
     public static func delete(id: String) throws {
+        _ = try checked(id)
         let audio = (try? load(id: id))?.audioURL ?? audioURL(for: id)
         try? FileManager.default.removeItem(at: audio)
         try FileManager.default.removeItem(at: url(for: id))

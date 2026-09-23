@@ -54,17 +54,19 @@ struct AIIntegrationSection: View {
                     }
                     ForEach(providers) { p in Text(p.title).tag(p.id) }
                 }
+                .accessibilityLabel(Text("Summarize with"))
                 Button {
                     detect()
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .help("Detect installed assistants again (Claude Code, Codex, Ollama, LM Studio, Claude Desktop, ChatGPT)")
+                .iconButtonHelp("Detect installed assistants again (Claude Code, Codex, Ollama, LM Studio, Claude Desktop, ChatGPT)")
             }
             if let provider, provider.needsModel {
                 Picker("Model", selection: $selectedModel) {
                     ForEach(provider.models, id: \.self) { Text($0).tag($0) }
                 }
+                .accessibilityLabel(Text("Model"))
             }
             HStack {
                 Button {

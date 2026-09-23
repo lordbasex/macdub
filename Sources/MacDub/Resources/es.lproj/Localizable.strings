@@ -393,3 +393,4 @@
 "Apple Intelligence (on-device)" = "Apple Intelligence (en el dispositivo)";
 "Claude Desktop (paste)" = "Claude Desktop (pegar)";
 "ChatGPT (paste)" = "ChatGPT (pegar)";
+"%@ is not valid JSON — fix it (or add MacDub by hand with Copy › JSON) so its other servers aren't lost." = "%@ no es un JSON válido: corrígelo (o añade MacDub a mano con Copiar › JSON) para no perder sus otros servidores.";

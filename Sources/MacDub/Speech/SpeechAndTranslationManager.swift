@@ -30,7 +30,13 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
 
     private let translator: TranslationBridge
     private let queue = DispatchQueue(label: "com.lordbasex.MacDub.speech", qos: .userInitiated)
-    private var engine: RecognitionEngine?
+    private var engine: RecognitionEngine? {
+        didSet { feedLock.lock(); feed = engine; feedLock.unlock() }
+    }
+    /// `engine` for `append`, which runs on the capture thread while `engine` is replaced on
+    /// `queue` (fallback to SFSpeechRecognizer, stop): reading it unlocked was a data race.
+    private var feed: RecognitionEngine?
+    private let feedLock = NSLock()
     private(set) var engineKind: RecognitionEngineKind = .legacy
     private var sourceLocale = Locale(identifier: "en-US")
     private var receivedTranscript = false
@@ -42,6 +48,9 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     private var volatileTail = ""
     /// SpeechAnalyzer: segment finalized results only (see `SpeechAnalyzerEngine.segmentsFinalsOnly`).
     var analyzerFinalsOnly = true
+    /// SpeechAnalyzer: longest wait for a final before volatile text goes out at a comma (nil:
+    /// engine default, 0: never).
+    var analyzerHardCap: TimeInterval?
 
     /// Last time a captured buffer had sound in it (peak above `soundThreshold`); written from
     /// the capture thread, read on `queue`.
@@ -118,6 +127,7 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         if kind == .analyzer, #available(macOS 26.0, *) {
             let analyzer = SpeechAnalyzerEngine()
             analyzer.segmentsFinalsOnly = analyzerFinalsOnly
+            if let cap = analyzerHardCap { analyzer.volatileHardCap = cap }
             engine = analyzer
         }
         #endif
@@ -187,7 +197,8 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
                 soundLock.lock(); lastSoundAt = Date(); soundLock.unlock()
             }
         }
-        engine?.append(buffer)
+        feedLock.lock(); let target = feed; feedLock.unlock()
+        target?.append(buffer)
     }
 
     /// Whether a pause in the transcript really is a pause in speech (see `analyzerStallFlush`).

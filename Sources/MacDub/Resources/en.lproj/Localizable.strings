@@ -362,3 +362,4 @@
 "Apple Intelligence (on-device)" = "Apple Intelligence (on-device)";
 "Claude Desktop (paste)" = "Claude Desktop (paste)";
 "ChatGPT (paste)" = "ChatGPT (paste)";
+"%@ is not valid JSON — fix it (or add MacDub by hand with Copy › JSON) so its other servers aren't lost." = "%@ is not valid JSON — fix it (or add MacDub by hand with Copy › JSON) so its other servers aren't lost.";

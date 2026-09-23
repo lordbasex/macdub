@@ -91,6 +91,8 @@ enum RecognitionBenchmark {
 
         // --analyzer-volatile: segment SpeechAnalyzer's volatile results too (the older behaviour).
         manager.analyzerFinalsOnly = !args.contains("--analyzer-volatile")
+        // --analyzer-cap <s>: SpeechAnalyzer's longest wait for a final (tuning runs).
+        manager.analyzerHardCap = value("--analyzer-cap", in: args).flatMap(Double.init)
         let process = ProcessSampler()
         let clock = ContinuousClock()
         let started = clock.now
@@ -99,7 +101,7 @@ enum RecognitionBenchmark {
         func write(complete: Bool) throws {
             let result: [String: Any] = [
                 "file": path, "engine": manager.engineKind.rawValue, "requestedEngine": requested.rawValue,
-                "analyzerFinalsOnly": manager.analyzerFinalsOnly,
+                "analyzerFinalsOnly": manager.analyzerFinalsOnly, "analyzerHardCap": manager.analyzerHardCap ?? 0,
                 "locale": locale.identifier, "speed": speed, "audioSeconds": fed,
                 "wallSeconds": (clock.now - started).seconds, "complete": complete,
                 "chip": SystemInfo.chip, "macOS": SystemInfo.macOSVersion, "arch": SystemInfo.architecture,

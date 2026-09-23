@@ -113,6 +113,12 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
     /// without a final, sentences the volatile text has already completed go out anyway; the
     /// final is later trimmed of them (`reported`).
     var volatileFallbackAfter: TimeInterval = 5
+    /// Upper bound on waiting: past it, the volatile text goes out up to its last clause mark
+    /// (or all but its last words). Finals normally arrive every ~4 s; this acts when
+    /// SpeechAnalyzer merged sentences or sat on one. Measured over 28 min: worst latency 19.6 →
+    /// 12.4 s, longest silence 31.7 → 15.2 s, for 92 → 85 % of sentences spoken whole (7 s:
+    /// 72 %). Cutting at audio pauses instead was tried and measured no better.
+    var volatileHardCap: TimeInterval = 10
     /// When the volatile text now in flight started (first volatile result after a final or a
     /// promotion); the fallback clock, so a pause in speech never counts as waiting.
     private var volatileSince: Date?
@@ -149,22 +155,26 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         let trimmed = (reported.isEmpty ? text : ReportedText.remainder(of: text, after: reported))
             .trimmingCharacters(in: .whitespaces)
         guard isFinal else {
-            var promoted = false
             let now = Date()
             if volatileSince == nil { volatileSince = now }
-            if let since = volatileSince, now.timeIntervalSince(since) > volatileFallbackAfter,
-               let end = ReportedText.endOfCompletedSentences(in: trimmed) {
-                let head = trimmed[..<end].trimmingCharacters(in: .whitespaces)
-                if !head.isEmpty {
-                    promoted = true
-                    reported += (reported.isEmpty ? "" : " ") + head
-                    finalized += (finalized.isEmpty ? "" : " ") + head
-                    volatileSince = now
-                }
+            let waited = now.timeIntervalSince(volatileSince ?? now)
+            // Past 5 s: sentences the volatile text completed. Past the cap: up to its last clause.
+            let capped = volatileHardCap > 0 && waited > volatileHardCap
+            let end = capped
+                ? ReportedText.endOfCompletedClauses(in: trimmed) ?? ReportedText.endKeepingLastWords(in: trimmed)
+                : waited > volatileFallbackAfter ? ReportedText.endOfCompletedSentences(in: trimmed) : nil
+            let head = end.map { trimmed[..<$0].trimmingCharacters(in: .whitespaces) } ?? ""
+            let promoted = !head.isEmpty
+            if promoted {
+                reported += (reported.isEmpty ? "" : " ") + head
+                finalized += (finalized.isEmpty ? "" : " ") + head
+                volatileSince = now
             }
-            volatile = promoted ? ReportedText.remainder(of: trimmed, after: reported) : trimmed
+            volatile = promoted ? ReportedText.remainder(of: trimmed, after: head) : trimmed
             let shown = volatile, cumulative = finalized
-            let rotate = finalized.count > maxFinalizedCharacters
+            // A capped piece ends at a comma, which the segmenter would keep pending: have the
+            // manager flush it now (rotation keeps `reported`, see restart).
+            let rotate = (promoted && capped) || finalized.count > maxFinalizedCharacters
             lock.unlock()
             onVolatile?(shown)
             if promoted { onTranscript?(cumulative, rotate) }

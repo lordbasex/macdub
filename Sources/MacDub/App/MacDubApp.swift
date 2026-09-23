@@ -6,6 +6,8 @@ import AppKit
 @main
 enum MacDubMain {
     static func main() {
+        // Writing to a pipe whose reader is gone (a CLI that quit early) must fail, not kill the app.
+        signal(SIGPIPE, SIG_IGN)
         if RecognitionBenchmark.isRequested { RecognitionBenchmark.runAndExit() }
         waitForReplacedInstance()
         if let running = otherInstance() {

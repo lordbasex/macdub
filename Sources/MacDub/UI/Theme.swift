@@ -163,6 +163,7 @@ struct RoundActionButton: View {
             .shadow(color: (destructive ? Color.red : palette.accent).opacity(0.7), radius: 24, y: 8)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.5)
     }
@@ -192,19 +193,30 @@ struct SidebarRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Plain buttons with an icon + text label get no accessible name of their own.
+        .accessibilityLabel(Text(section.title))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
 /// A labelled row inside a glass card (label left, control right).
 struct CardRow<Control: View>: View {
     let title: LocalizedStringKey
+    /// Name the control after the title (VoiceOver). Off for rows that hold several controls —
+    /// the outer label would override theirs — which then name their main control themselves.
+    var labelsControl = true
     @ViewBuilder var control: Control
 
     var body: some View {
         HStack {
             Text(title).foregroundStyle(Theme.secondaryText)
+                .accessibilityHidden(labelsControl)  // then it is the control's name, not separate text
             Spacer()
-            control
+            if labelsControl {
+                control.accessibilityLabel(Text(title))
+            } else {
+                control
+            }
         }
         .frame(minHeight: 28)
     }
@@ -232,5 +244,12 @@ extension Settings {
     /// Two-way binding into a `Settings` property for SwiftUI controls.
     func binding<T>(_ keyPath: ReferenceWritableKeyPath<Settings, T>) -> Binding<T> {
         Binding(get: { self[keyPath: keyPath] }, set: { self[keyPath: keyPath] = $0 })
+    }
+}
+
+extension View {
+    /// Tooltip and VoiceOver name for icon-only buttons, from one localized key so they stay in sync.
+    func iconButtonHelp(_ key: LocalizedStringKey) -> some View {
+        help(key).accessibilityLabel(Text(key))
     }
 }

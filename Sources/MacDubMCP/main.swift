@@ -300,6 +300,7 @@ let tools: [Tool] = [
             "seconds": ["type": "number", "minimum": 1, "maximum": 120, "description": "Length of the snippet (default 15)"],
             "path": ["type": "string", "description": "Destination .wav (default: a temp file under MacDub's Application Support folder)"],
             "inline": ["type": "boolean", "description": "Embed the WAV as audio content (only for snippets ≤ 30 s)"],
+            "overwrite": ["type": "boolean", "description": "Replace an existing file at `path` (default false)"],
         ]],
         run: { args in
             let s = try liveState()
@@ -308,9 +309,23 @@ let tools: [Tool] = [
             let url: URL
             if let given = args["path"] as? String, !given.isEmpty {
                 url = URL(fileURLWithPath: NSString(string: given).expandingTildeInPath)
+                // The file is replaced by a recording: only a .wav, and never an existing file
+                // unless asked — this used to delete whatever `path` named.
+                guard url.pathExtension.lowercased() == "wav" else {
+                    throw ToolError.invalidArgument("path must end in .wav")
+                }
+                if FileManager.default.fileExists(atPath: url.path), (args["overwrite"] as? Bool) != true {
+                    throw ToolError.invalidArgument("\(url.path) exists — pass overwrite: true to replace it")
+                }
             } else {
                 let dir = LiveStateStore.directory.appendingPathComponent("snippets", isDirectory: true)
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                // Default snippets are for the assistant's immediate use: drop ones older than a day.
+                let dayAgo = Date().addingTimeInterval(-86_400)
+                for old in (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+                where ((try? old.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture) < dayAgo {
+                    try? FileManager.default.removeItem(at: old)
+                }
                 url = dir.appendingPathComponent("snippet-\(Int(Date().timeIntervalSince1970)).wav")
             }
             let errorURL = url.appendingPathExtension("error")
@@ -855,6 +870,8 @@ func dispatch(_ message: [String: Any]) -> [String: Any]? {
 import Network
 
 final class HTTPTransport {
+    /// JSON-RPC requests are small; anything bigger is refused (413) instead of buffered forever.
+    static let maxBodyBytes = 4 * 1024 * 1024
     private let listener: NWListener
     private let queue = DispatchQueue(label: "macdub-mcp.http")
     private var streams: [ObjectIdentifier: NWConnection] = [:]
@@ -898,6 +915,9 @@ final class HTTPTransport {
             guard let self else { return }
             var buf = buffer
             if let data { buf.append(data) }
+            if buf.count > Self.maxBodyBytes + 64 * 1024 {
+                self.respond(conn, status: 413, body: "request too large"); return
+            }
             self.log("received \(data?.count ?? 0) bytes (total \(buf.count)) complete=\(isComplete) error=\(String(describing: error))")
             if let headerEnd = buf.range(of: Data("\r\n\r\n".utf8)) {
                 let head = String(decoding: buf[..<headerEnd.lowerBound], as: UTF8.self)
@@ -909,7 +929,11 @@ final class HTTPTransport {
                         headers[line[..<i].trimmingCharacters(in: .whitespaces).lowercased()] = line[line.index(after: i)...].trimmingCharacters(in: .whitespaces)
                     }
                 }
-                let length = Int(headers["content-length"] ?? "0") ?? 0
+                // A negative length used to build an inverted range and crash the server; cap the size too.
+                let length = Int(headers["content-length"] ?? "0") ?? -1
+                guard (0...Self.maxBodyBytes).contains(length) else {
+                    self.respond(conn, status: 413, body: "bad or too large Content-Length"); return
+                }
                 let bodyStart = headerEnd.upperBound
                 if buf.count - bodyStart < length, !isComplete, error == nil {
                     self.readRequest(conn, buffer: buf) // wait for the rest of the body
@@ -925,9 +949,31 @@ final class HTTPTransport {
         }
     }
 
+    static let loopbackHosts: Set<String> = ["localhost", "127.0.0.1", "::1", "[::1]"]
+
+    /// "localhost:8765", "127.0.0.1", "[::1]:8765" → loopback; anything else is not.
+    static func isLoopback(host: String) -> Bool {
+        var h = host.lowercased()
+        if h.hasPrefix("[") { h = String(h.prefix { $0 != "]" }) + "]" }
+        else if let colon = h.lastIndex(of: ":"), h.filter({ $0 == ":" }).count == 1 { h = String(h[..<colon]) }
+        return loopbackHosts.contains(h)
+    }
+
+    /// Exactly http(s)://<loopback>[:port] — parsed, not matched as a substring.
+    static func isLoopback(origin: String) -> Bool {
+        guard let url = URL(string: origin), let scheme = url.scheme, ["http", "https"].contains(scheme),
+              let host = url.host else { return false }
+        return loopbackHosts.contains(host.lowercased())
+    }
+
     private func route(_ conn: NWConnection, method: String, path: String, headers: [String: String], body: Data) {
-        // DNS-rebinding guard: browsers send Origin; only localhost origins may talk to us.
-        if let origin = headers["origin"], !(origin.contains("://127.0.0.1") || origin.contains("://localhost")) {
+        // DNS-rebinding guard. A page on a rebinding domain reaches 127.0.0.1 with its own Host
+        // and Origin, so both must name this machine *exactly* ("localhost.evil.com" used to pass
+        // a substring check).
+        if let host = headers["host"], !Self.isLoopback(host: host) {
+            respond(conn, status: 403, body: "forbidden host"); return
+        }
+        if let origin = headers["origin"], origin != "null", !Self.isLoopback(origin: origin) {
             respond(conn, status: 403, body: "forbidden origin"); return
         }
         if let token, headers["authorization"] != "Bearer \(token)" {
@@ -990,7 +1036,7 @@ final class HTTPTransport {
     }
 
     private func respond(_ conn: NWConnection, status: Int, contentType: String, data: Data) {
-        let reason = [200: "OK", 202: "Accepted", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed"][status] ?? "OK"
+        let reason = [200: "OK", 202: "Accepted", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 413: "Payload Too Large"][status] ?? "Error"
         var head = "HTTP/1.1 \(status) \(reason)\r\nContent-Type: \(contentType)\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
         head.reserveCapacity(head.count + data.count)
         var payload = head.data(using: .utf8)!

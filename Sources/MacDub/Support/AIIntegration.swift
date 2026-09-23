@@ -15,6 +15,15 @@ enum Shell {
         let out = Pipe()
         process.standardOutput = out
         process.standardError = out
+        // Drain the output while the process runs: reading only after it exits left a CLI that
+        // prints more than the pipe buffer (~64 KB, e.g. `codex exec --json` events) blocked
+        // until the timeout.
+        var collected = Data()
+        let collectedLock = NSLock()
+        out.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            collectedLock.lock(); collected.append(chunk); collectedLock.unlock()
+        }
         var inputPipe: Pipe?
         if stdin != nil {
             inputPipe = Pipe()
@@ -22,13 +31,25 @@ enum Shell {
         }
         try process.run()
         if let stdin, let inputPipe {
-            inputPipe.fileHandleForWriting.write(stdin.data(using: .utf8) ?? Data())
-            try? inputPipe.fileHandleForWriting.close()
+            // Off the calling thread, and with SIGPIPE ignored (MacDubMain): a CLI that exits
+            // before reading (not logged in, bad flag) makes this write fail instead of killing us.
+            let writer = inputPipe.fileHandleForWriting
+            let data = Data(stdin.utf8)
+            DispatchQueue.global(qos: .userInitiated).async {
+                try? writer.write(contentsOf: data)
+                try? writer.close()
+            }
         }
         let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning, Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
         if process.isRunning { process.terminate() }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        out.fileHandleForReading.readabilityHandler = nil
+        let rest = (try? out.fileHandleForReading.readToEnd()) ?? nil
+        collectedLock.lock()
+        if let rest { collected.append(rest) }
+        let data = collected
+        collectedLock.unlock()
         return (process.terminationStatus, stripTerminalEscapes(String(data: data, encoding: .utf8) ?? ""))
     }
 
@@ -145,9 +166,15 @@ enum MCPInstaller {
     /// Merges `mcpServers.macdub` into Claude Desktop's config file (created if missing).
     static func addToClaudeDesktop() throws {
         var root: [String: Any] = [:]
-        if let data = try? Data(contentsOf: claudeDesktopConfig),
-           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        if let data = try? Data(contentsOf: claudeDesktopConfig) {
+            // A config that doesn't parse (a trailing comma after a hand edit) is left alone:
+            // writing a fresh one would drop every other server configured there.
+            guard let existing = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                throw IntegrationError.failed(LF("%@ is not valid JSON — fix it (or add MacDub by hand with Copy › JSON) so its other servers aren't lost.",
+                                                claudeDesktopConfig.path))
+            }
             root = existing
+            try? data.write(to: claudeDesktopConfig.appendingPathExtension("macdub-backup"), options: .atomic)
         }
         var servers = root["mcpServers"] as? [String: Any] ?? [:]
         servers["macdub"] = ["command": serverPath]

@@ -11,7 +11,7 @@ cask "macdub" do
   desc "Real-time, fully offline dubbing of any app's audio (Apple frameworks only)"
   homepage "https://github.com/lordbasex/macdub"
 
-  depends_on macos: ">= :sequoia"
+  depends_on macos: :sequoia
 
   app "MacDub.app"
   binary "#{appdir}/MacDub.app/Contents/Helpers/macdub-mcp"

@@ -98,3 +98,27 @@ import MacDubCore
         #expect(record.audioURL == nil)
     }
 }
+
+@Suite struct SessionPathSafetyTests {
+    @Test func uuidsAreValidIDs() {
+        #expect(SessionStore.isValidID("DDA6FE15-EC69-4D5D-A7C2-0F01D09CFE28"))
+    }
+
+    // What an MCP client could send to delete_session / get_session / export_session.
+    @Test func traversalIDsAreRefused() {
+        for id in ["../../Claude/claude_desktop_config", "..", "a/b", "", "x\u{0}y", String(repeating: "a", count: 65)] {
+            #expect(!SessionStore.isValidID(id))
+            #expect(!SessionStore.exists(id: id))
+            #expect(throws: (any Error).self) { try SessionStore.delete(id: id) }
+        }
+    }
+
+    @Test func audioFileMustStayInTheAudioFolder() {
+        var r = SessionRecord(id: "A", startedAt: Date(), appName: nil, appBundleIdentifier: nil,
+                              sourceLocale: "en-US", targetLanguage: "es", segments: [])
+        r.audioFile = "../../Documents/thesis.docx"
+        #expect(r.audioURL == nil)
+        r.audioFile = ".hidden.m4a"
+        #expect(r.audioURL == nil)
+    }
+}

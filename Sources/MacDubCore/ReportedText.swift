@@ -57,11 +57,30 @@ public enum ReportedText {
     /// then" → after "home."), so a sentence still being spoken is never cut. An abbreviation
     /// such as "Mr." counts only once more words follow it — acceptable for the fallback it serves.
     public static func endOfCompletedSentences(in text: String) -> String.Index? {
+        lastBoundary(in: text, marks: ".?!")
+    }
+
+    /// Like `endOfCompletedSentences`, also accepting clause marks (`, ; :`): the fallback when a
+    /// recognizer merged two sentences and dropped the period between them ("… than before, as
+    /// he stepped up to the cab, …").
+    public static func endOfCompletedClauses(in text: String) -> String.Index? {
+        lastBoundary(in: text, marks: ".?!,;:")
+    }
+
+    /// The end of all but the last `keep` words, when `text` has at least `minWords` words — the
+    /// last resort for long unpunctuated speech; the kept words may still be revised.
+    public static func endKeepingLastWords(in text: String, keep: Int = 3, minWords: Int = 15) -> String.Index? {
+        let spaces = text.indices.filter { text[$0].isWhitespace && $0 > text.startIndex && !text[text.index(before: $0)].isWhitespace }
+        guard spaces.count + 1 >= minWords, spaces.count >= keep else { return nil }
+        return spaces[spaces.count - keep]
+    }
+
+    private static func lastBoundary(in text: String, marks: String) -> String.Index? {
         var result: String.Index?
         var i = text.startIndex
         while i < text.endIndex {
             let next = text.index(after: i)
-            if ".?!".contains(text[i]), next < text.endIndex, text[next].isWhitespace,
+            if marks.contains(text[i]), next < text.endIndex, text[next].isWhitespace,
                text[next...].contains(where: { $0.isLetter }) {
                 result = next
             }

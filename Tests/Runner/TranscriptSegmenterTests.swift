@@ -171,3 +171,26 @@ import MacDubCore
         #expect(head("It costs 3.5 dollars and") == nil)
     }
 }
+
+@Suite struct LatencyCapBoundaryTests {
+    private func head(_ text: String, _ end: String.Index?) -> String? { end.map { String(text[..<$0]) } }
+
+    // The benchmark case: SpeechAnalyzer dropped the period and joined two sentences with a comma.
+    @Test func clauseMarkEndsTheHead() {
+        let t = "Presly he emerged, looking even more flurried than before, as he stepped up"
+        #expect(head(t, ReportedText.endOfCompletedClauses(in: t)) == "Presly he emerged, looking even more flurried than before,")
+    }
+
+    @Test func noClauseYet() {
+        #expect(ReportedText.endOfCompletedClauses(in: "He was in the house about half") == nil)
+    }
+
+    @Test func keepsTheLastWordsOfLongUnpunctuatedSpeech() {
+        let t = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen"
+        #expect(head(t, ReportedText.endKeepingLastWords(in: t)) == "one two three four five six seven eight nine ten eleven twelve thirteen")
+    }
+
+    @Test func shortSpeechIsLeftAlone() {
+        #expect(ReportedText.endKeepingLastWords(in: "only a few words here") == nil)
+    }
+}

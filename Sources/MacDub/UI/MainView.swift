@@ -58,6 +58,7 @@ struct MainView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(Text("Settings"))
             HStack(spacing: 8) {
                 AppIconView(size: 22)
                 Text("MacDub \(Bundle.main.shortVersion)").font(.caption).foregroundStyle(Theme.tertiaryText)
@@ -148,7 +149,7 @@ struct DubSectionView: View {
     private var sessionCard: some View {
         GlassCard {
             VStack(spacing: 10) {
-                CardRow(title: "Application") {
+                CardRow(title: "Application", labelsControl: false) {
                     HStack(spacing: 6) {
                         Picker("", selection: $state.selectedTargetID) {
                             Text("Choose…").tag(String?.none)
@@ -162,9 +163,10 @@ struct DubSectionView: View {
                             }
                         }
                         .labelsHidden().frame(maxWidth: 240)
+                        .accessibilityLabel(Text("Application"))
                         Button { Task { await state.refreshTargets() } } label: { Image(systemName: "arrow.clockwise") }
                             .buttonStyle(.borderless).foregroundStyle(Theme.secondaryText)
-                            .help("Refresh running applications")
+                            .iconButtonHelp("Refresh running applications")
                     }
                 }
                 Divider().overlay(Theme.cardStroke)
@@ -197,20 +199,22 @@ struct DubSectionView: View {
                     hint("This language pair is not supported.", action: nil) {}
                 }
                 Divider().overlay(Theme.cardStroke)
-                CardRow(title: "Voice") {
+                CardRow(title: "Voice", labelsControl: false) {
                     HStack(spacing: 6) {
                         VoicePickerView(title: "", voices: state.voices, selection: settings.binding(\.voiceIdentifier))
                             .equatable().labelsHidden().frame(maxWidth: 280)
+                            .accessibilityLabel(Text("Voice"))
                         Button { state.testVoice() } label: { Image(systemName: "play.circle") }
-                            .buttonStyle(.borderless).foregroundStyle(Theme.secondaryText).help("Test voice")
+                            .buttonStyle(.borderless).foregroundStyle(Theme.secondaryText).iconButtonHelp("Test voice")
                         Button { state.reloadVoices() } label: { Image(systemName: "arrow.clockwise") }
-                            .buttonStyle(.borderless).foregroundStyle(Theme.secondaryText).help("Reload the voice list after downloading voices in System Settings")
+                            .buttonStyle(.borderless).foregroundStyle(Theme.secondaryText).iconButtonHelp("Reload the voice list after downloading voices in System Settings")
                     }
                 }
                 if settings.usesProcessTap {
                     CardRow(title: "Original audio") {
                         HStack {
                             Slider(value: settings.binding(\.originalVolume), in: 0...1).frame(width: 180)
+                                .accessibilityLabel(Text("Original audio"))
                             Text("\(Int(settings.originalVolume * 100)) %").monospacedDigit().foregroundStyle(Theme.secondaryText).frame(width: 44, alignment: .trailing)
                         }
                     }
@@ -330,6 +334,7 @@ struct DubSectionView: View {
             .frame(width: 96)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
     }
 }
 

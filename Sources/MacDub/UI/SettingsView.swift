@@ -74,6 +74,7 @@ private struct GeneralSettingsTab: View {
                         Text(state.storageSize.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "…")
                             .monospacedDigit()
                         Button { state.refreshStorageSize() } label: { Image(systemName: "arrow.clockwise") }
+                            .iconButtonHelp("Refresh")
                             .buttonStyle(.borderless)
                         Button("Show in Finder") {
                             try? FileManager.default.createDirectory(at: MacDubPaths.dataDirectory, withIntermediateDirectories: true)
@@ -275,7 +276,7 @@ private struct VoiceSettingsTab: View {
                 HStack {
                     VoicePickerView(voices: state.voices, selection: settings.binding(\.voiceIdentifier)).equatable()
                     Button { state.reloadVoices() } label: { Image(systemName: "arrow.clockwise") }
-                        .help("Reload the voice list after downloading voices in System Settings")
+                        .iconButtonHelp("Reload the voice list after downloading voices in System Settings")
                 }
                 Text("🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here.")
                     .font(.caption).foregroundStyle(.secondary)

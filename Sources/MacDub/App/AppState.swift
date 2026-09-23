@@ -441,7 +441,10 @@ final class AppState: ObservableObject {
                     guard let path = note.userInfo?["path"] as? String else { return }
                     await UISnapshots.capture(to: URL(fileURLWithPath: path), label: note.userInfo?["label"] as? String ?? "ui", state: self)
                 case .exportAudio:
-                    guard let path = note.userInfo?["path"] as? String else { return }
+                    // Any local process can post this command: write .wav files only, so it can't
+                    // be used to replace other files with a recording.
+                    guard let path = note.userInfo?["path"] as? String,
+                          URL(fileURLWithPath: path).pathExtension.lowercased() == "wav" else { return }
                     let seconds = Double(note.userInfo?["seconds"] as? String ?? "") ?? 15
                     let url = URL(fileURLWithPath: path)
                     do {
@@ -735,7 +738,10 @@ final class AppState: ObservableObject {
                 throw MacDubError.screenRecordingDenied
             }
             var auth = SpeechAndTranslationManager.authorizationStatus()
-            if auth == .notDetermined { auth = await SpeechAndTranslationManager.requestAuthorization() }
+            if auth == .notDetermined {
+                auth = await SpeechAndTranslationManager.requestAuthorization()
+                try ensureStillStarting()
+            }
             switch auth {
             case .authorized: break
             case .restricted: throw MacDubError.speechRecognitionRestricted
@@ -744,6 +750,7 @@ final class AppState: ObservableObject {
 
             // 2. Translation model
             let status = await TranslationCatalog.status(from: sourceLanguageForTranslation, to: settings.targetLanguage)
+            try ensureStillStarting()
             capabilities.translationStatus = status
             if status == .unsupported {
                 throw MacDubError.translationUnsupported(source: sourceLanguageForTranslation.minimalIdentifier,
@@ -801,16 +808,34 @@ final class AppState: ObservableObject {
                 try await capture.start(target: target, onBuffer: sink)
                 activeEngine = "sck"
             }
+            try ensureStillStarting()
 
             settings.lastTargetBundleID = target.bundleIdentifier
             latency = LatencyStats()
             startSilenceWatchdog()
             phase = .running
             Log.app.info("Pipeline running (\(self.activeEngine ?? "-", privacy: .public)): \(target.name, privacy: .public) \(self.settings.sourceLocaleID, privacy: .public) → \(self.settings.targetLanguageID, privacy: .public)")
+        } catch is StartCancelled {
+            // stop() tore the pipeline down while this start() awaited; stop what started since,
+            // without archiving the session a second time.
+            await capture.stop()
+            tap.stop()
+            speech.stop()
+            activeEngine = nil
+            activeRecognitionEngine = nil
+            Log.app.info("Start cancelled by a stop")
         } catch {
             present(error)
             await teardown()
         }
+    }
+
+    /// A stop() (menu, hot key, MCP) can arrive while start() awaits permissions, the translation
+    /// model or the capture engine; start() must not then carry on and mark a torn-down pipeline
+    /// as running.
+    private struct StartCancelled: Error {}
+    private func ensureStillStarting() throws {
+        if phase != .starting { throw StartCancelled() }
     }
 
     func stop() async {
