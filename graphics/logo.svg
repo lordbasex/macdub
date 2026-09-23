@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MacDub logo — vector twin of the app icon drawn by scripts/make-icon.swift (same geometry on a
+  1024 pt canvas: macOS squircle, deep indigo gradient, white speech bubble carrying a pink→orange
+  waveform). Keep the two in sync when the icon changes.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tile" x1="92.16" y1="92.16" x2="931.84" y2="931.84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4D2E9E"/>
+      <stop offset="1" stop-color="#1C144D"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="302.08" cy="260.10" r="671.74" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wave" x1="312.49" y1="0" x2="711.51" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF528C"/>
+      <stop offset="1" stop-color="#FF8C40"/>
+    </linearGradient>
+    <clipPath id="tileClip">
+      <rect x="92.16" y="92.16" width="839.68" height="839.68" rx="188.93" ry="188.93"/>
+    </clipPath>
+    <filter id="tileShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12.3" stdDeviation="17.9" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <filter id="bubbleShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8.2" stdDeviation="10.2" flood-color="#000000" flood-opacity="0.30"/>
+    </filter>
+  </defs>
+
+  <!-- Tile: squircle with gradient and a soft highlight in the top-left corner -->
+  <g filter="url(#tileShadow)">
+    <rect x="92.16" y="92.16" width="839.68" height="839.68" rx="188.93" ry="188.93" fill="url(#tile)"/>
+  </g>
+  <rect x="92.16" y="92.16" width="839.68" height="839.68" clip-path="url(#tileClip)" fill="url(#glow)"/>
+
+  <!-- Speech bubble with its tail at the bottom-left -->
+  <g filter="url(#bubbleShadow)" fill="#FAFAFF">
+    <rect x="234.91" y="276.79" width="554.19" height="369.46" rx="103.45" ry="103.45"/>
+    <polygon points="356.83,638.91 329.12,720.19 445.50,638.91"/>
+  </g>
+
+  <!-- Waveform: six rounded bars, pink → orange, centred in the bubble -->
+  <g fill="url(#wave)">
+    <rect x="312.49" y="426.03" width="46.55" height="70.94" rx="23.27"/>
+    <rect x="382.94" y="392.76" width="46.55" height="137.48" rx="23.27"/>
+    <rect x="453.39" y="350.65" width="46.55" height="221.71" rx="23.27"/>
+    <rect x="523.84" y="381.68" width="46.55" height="159.63" rx="23.27"/>
+    <rect x="594.29" y="414.94" width="46.55" height="93.12" rx="23.27"/>
+    <rect x="664.74" y="434.90" width="46.55" height="53.21" rx="23.27"/>
+  </g>
+</svg>

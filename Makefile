@@ -4,13 +4,14 @@
 #   make setup      check the toolchain on a fresh Mac and create the dev signing certificate
 #   make            build a universal (x86_64 + arm64) release .app into build/
 #   make run        build for this Mac's architecture only and launch it
+#   make dmg        universal build packed as a drag-to-Applications disk image (build/MacDub-<version>.dmg)
 #   make debug      debug build for this architecture
 #   make check      type-check quickly (swift build, no bundle)
 #   make clean
 #
 # Variables you can override: CODESIGN_IDENTITY, BUNDLE_ID, VERSION, ARCHS, CONFIG.
 
-.PHONY: all setup universal run debug check test clean reset-permissions notarize release zip
+.PHONY: all setup universal run debug check test clean reset-permissions notarize release zip dmg dmg-native
 
 setup:
 	./scripts/setup.sh
@@ -55,3 +56,13 @@ zip:
 	ditto -c -k --keepParent build/MacDub.app build/MacDub-universal.zip
 	shasum -a 256 build/MacDub-universal.zip
 	@echo "✔ build/MacDub-universal.zip — on the other Mac: unzip, right-click › Open the first time"
+
+# Installer disk image: MacDub.app + Applications shortcut, MacDub icon on the volume, background
+# with an arrow. `dmg` packs a universal build; `dmg-native` reuses the current build/MacDub.app
+# (e.g. right after make run) for a quick local check.
+dmg:
+	./scripts/build-app.sh
+	./scripts/make-dmg.sh
+
+dmg-native:
+	./scripts/make-dmg.sh

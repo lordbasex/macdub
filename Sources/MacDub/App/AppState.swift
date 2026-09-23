@@ -569,8 +569,27 @@ final class AppState: ObservableObject {
     // MARK: Windows
 
     func showMainWindow() {
-        openWindowAction?.callAsFunction(id: Self.mainWindowID)
+        // The window is hidden, not closed, when the user closes it (see MainWindowBehavior);
+        // bring it back directly, and let SwiftUI create it if it does not exist yet.
+        if let window = mainWindow {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            openWindowAction?.callAsFunction(id: Self.mainWindowID)
+        }
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private var mainWindow: NSWindow? {
+        NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(Self.mainWindowID) == true || $0.title == "MacDub" }
+    }
+
+    /// The translation session lives in the main window's view tree and does not come back by
+    /// itself if it was ever cancelled; when the window (re)appears with a configuration but no
+    /// running session, restart it.
+    func ensureTranslationSession() {
+        if translation.configuration != nil, translation.status == .idle {
+            translation.prepare()
+        }
     }
 
     func showHistory() {

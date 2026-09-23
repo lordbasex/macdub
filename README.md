@@ -4,11 +4,18 @@
 
 MacDub captures the audio of any app (Zoom, Teams, VLC, Safari, Chrome, Music — or the whole system), transcribes it, translates it and reads the translation aloud with a system voice, keeping the original quietly in the background like a documentary. Everything runs on your Mac with Apple's own frameworks. No cloud, no API keys, no virtual audio drivers, and the microphone is never touched.
 
-```
- App / system audio ──▶ Speech (on-device) ──▶ Translation (on-device) ──▶ AVSpeechSynthesizer
-   Core Audio tap /       original text           translated text            system voice
-   ScreenCaptureKit
-```
+![MacDub pipeline: app or system audio → on-device speech recognition → on-device translation → system voice](images/pipeline.png)
+
+## Screenshots
+
+The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Bring advanced speech-to-text to your app with SpeechAnalyzer*](https://www.youtube.com/watch?v=0m6dimDDj8M) playing in Google Chrome, English → Spanish.
+
+| | |
+|---|---|
+| **Dubbing** — pick the app, the languages and a voice, press Start ![Dubbing screen](images/dubbing.png) | **Live transcript** — original + translation, the word being spoken highlighted, latency per sentence ![Live transcript while dubbing](images/dubbing-live.png) |
+| **Floating subtitle bar** — always on top of the video you are watching ![Floating subtitle bar](images/subtitle-bar.png) | **Menu bar panel** — status, last lines, Start/Stop and quick controls ![Menu bar panel](images/menubar.png) |
+| **History** — recorded audio with a live spectrum, the transcript following karaoke-style, playback modes ![History with player](images/history.png) | **Subtitles** — transcript options, floating bar and exports ![Subtitles screen](images/subtitles.png) |
+| **AI & MCP** — local summaries and one-click MCP registration ![AI & MCP screen](images/ai-mcp.png) | **Settings** — General, Capture, Speech, Voice, Subtitles, AI & MCP, Permissions ![Settings window](images/settings.png) |
 
 - macOS **15 Sequoia or later** (developed and tested on 15.7.3); ready for macOS 26.
 - Universal binary — Intel and Apple Silicon.
@@ -63,7 +70,7 @@ brew install --cask macdub
 
 ### Download
 
-Grab `MacDub-<version>.zip` from the [Releases](https://github.com/lordbasex/macdub/releases) page, unzip and move `MacDub.app` to `/Applications`. Until releases are notarized, right-click › Open the first time.
+Grab `MacDub-<version>.dmg` from the [Releases](https://github.com/lordbasex/macdub/releases) page, open it and drag MacDub to the Applications folder shown next to it (a `.zip` with the bare app is there too). Until releases are notarized, right-click › Open the first time.
 
 ### Build from source (no Xcode needed)
 
@@ -74,8 +81,11 @@ make setup      # checks macOS 15+, Command Line Tools with Swift 6, SDK framewo
 make run        # native-arch build → build/MacDub.app, then launches it
 make            # universal (x86_64 + arm64) build
 make zip        # universal zip to try on another Mac
+make dmg        # universal build packed as a drag-to-Applications disk image (build/MacDub-<version>.dmg)
 make test       # unit tests
 ```
+
+`make dmg` needs only macOS tools (`hdiutil`, `SetFile`, `osascript`); the mounted image shows the MacDub icon, a background with an arrow, the app and an Applications shortcut. The Finder layout step asks once for permission to control Finder. `make dmg-native` packs the current `build/MacDub.app` without rebuilding.
 
 There are **no third-party dependencies** — nothing is downloaded. The only requirement is macOS 15+ with the Command Line Tools (Swift ≥ 6.0). On a fresh Mac, `make setup` (or the first `make run`) launches `xcode-select --install` for you, waits for Apple's installer to finish, verifies the SDK and creates the dev signing certificate.
 
@@ -168,9 +178,12 @@ Sources/MacDub/
                                AppleIntelligenceSummarizer, GlobalHotKey, LaunchAtLogin, errors
   Resources/<lang>.lproj/      Localizable.strings
 Tests/Runner/                  Swift Testing suites + executable runner
-Packaging/                     Info.plist template, entitlements, AppIcon.icns
+Packaging/                     Info.plist template, entitlements, AppIcon.icns, dmg-background.tiff
+graphics/                      logo.svg (vector twin of the app icon), pipeline.svg (the diagram above)
+images/                        Screenshots and the rendered pipeline diagram used by this README
 scripts/                       build-app.sh, run.sh, make-dev-cert.sh, make-icon.swift,
-                               sign-and-notarize.sh, release.sh, reset-permissions.sh
+                               make-dmg.sh + make-dmg-background.swift, sign-and-notarize.sh,
+                               release.sh, reset-permissions.sh
 Casks/macdub.rb                Homebrew cask (updated by release.sh)
 .github/workflows/ci.yml       Build, test, universal artifact, draft release on tags
 ```
@@ -203,7 +216,7 @@ The UI follows the system language (or *Settings › General › Language*). To 
 VERSION=0.2.0 CODESIGN_IDENTITY="Developer ID Application: … (TEAMID)" NOTARY_PROFILE=MacDub-Notary make release
 ```
 
-Builds the universal app, signs and notarizes (when the identity and notary profile are set), zips it, writes the SHA-256, updates `Casks/macdub.rb` and creates the GitHub release with `gh`. The CI workflow builds and tests on every push and attaches an unsigned universal zip as a draft release on tags.
+Builds the universal app, signs and notarizes (when the identity and notary profile are set), zips it, packs the `.dmg`, writes the SHA-256 of both, updates `Casks/macdub.rb` and creates the GitHub release with `gh`. The CI workflow builds and tests on every push and attaches an unsigned universal zip as a draft release on tags.
 
 ## Known limitations
 

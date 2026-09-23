@@ -6,7 +6,7 @@
 #   VERSION=0.2.0 ./scripts/release.sh                 # ad-hoc/dev-signed zip, no notarization
 #   VERSION=0.2.0 CODESIGN_IDENTITY="Developer ID Application: …" NOTARY_PROFILE=MacDub-Notary ./scripts/release.sh
 #
-# Outputs: build/MacDub-<version>.zip, build/MacDub-<version>.zip.sha256, Casks/macdub.rb updated.
+# Outputs: build/MacDub-<version>.zip (+ .sha256), build/MacDub-<version>.dmg (+ .sha256), Casks/macdub.rb updated.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,6 +29,10 @@ SHA="$(shasum -a 256 "$ZIP" | awk '{print $1}')"
 echo "$SHA  $(basename "$ZIP")" > "$ZIP.sha256"
 echo "▶ $(basename "$ZIP") sha256 $SHA"
 
+# Drag-to-install image next to the zip (the cask keeps using the zip).
+"$ROOT/scripts/make-dmg.sh"
+DMG="$ROOT/build/MacDub-$VERSION.dmg"
+
 echo "▶ Updating Casks/macdub.rb"
 sed -i '' -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" "$ROOT/Casks/macdub.rb"
 
@@ -37,7 +41,7 @@ GH="$(command -v gh || /bin/zsh -lc 'command -v gh' 2>/dev/null || true)"
 if [[ -n "$GH" && "${GITHUB_RELEASE:-1}" == "1" ]]; then
   gh() { "$GH" "$@"; }
   echo "▶ Creating GitHub release v$VERSION on $REPO"
-  gh release create "v$VERSION" "$ZIP" "$ZIP.sha256" --repo "$REPO" --title "MacDub $VERSION" --generate-notes \
+  gh release create "v$VERSION" "$ZIP" "$ZIP.sha256" "$DMG" "$DMG.sha256" --repo "$REPO" --title "MacDub $VERSION" --generate-notes \
     || echo "  (gh release failed or already exists — upload $ZIP manually)"
 else
   echo "▶ GitHub release skipped ($([[ -n "$GH" ]] && echo 'GITHUB_RELEASE=0' || echo 'gh not installed')): upload $ZIP to https://github.com/$REPO/releases/new (tag v$VERSION)"
