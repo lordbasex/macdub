@@ -282,17 +282,26 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - [x] System status in Settings: chip, cores, memory, macOS, speech engine, Apple Intelligence.
 - [x] Summaries show elapsed seconds live and, when done, time, exact tokens (Apple Intelligence, Claude Code, Codex, Ollama, LM Studio) and cost (Claude Code); Apple Intelligence summaries fit the model's 4,096-token window.
 - [x] Settings › Permissions: reset MacDub's permissions and relaunch in one click; a single instance of the app at a time.
+- [x] 0.3.1: MCP server hardened (DNS rebinding, path traversal, unsafe file deletion, malformed requests), SpeechAnalyzer waits bounded (worst latency 19.6 → 12.4 s), VoiceOver names on the main screens, verified on Intel.
 
 ### Next
 
-- [ ] Benchmarks from other Apple Silicon generations (M2–M6) and from real recordings, not only synthesized speech.
+In priority order, from the 0.3.1 review:
+
+- [ ] Run on macOS 15 — the only engine there is `SFSpeechRecognizer` and there is no Apple Intelligence; tested so far on Apple Silicon (M1, macOS 26.7) and Intel.
+- [ ] Improve `SFSpeechRecognizer` segmentation: it loses ~14 % of the words at run rotations and silence cuts, and speaks half the sentences in pieces.
+- [ ] Authenticate the app's internal commands (XPC or a shared secret instead of open distributed notifications) and require a token on the MCP HTTP transport by default.
+- [ ] Automated tests for the app and the MCP server: `SessionStore`, MCP tools and HTTP transport, `Shell.run`.
+- [ ] VoiceOver in Settings, the menu bar panel, the floating subtitle bar and the History list, and a full session driven with VoiceOver.
+- [ ] Benchmarks from other Apple Silicon generations (M2–M6) and from real recordings in other languages, not only synthesized English.
 - [ ] Profile a full dubbing session (capture + recognition + translation + voice), Neural Engine energy included (`powermetrics`).
-- [ ] Notarized releases and the Homebrew tap once the Developer ID is available.
+- [ ] Notarized releases once the Developer ID is available (no more right-click › Open on first launch).
 
 ### Later
 
 - [ ] Speaker diarization (voice per speaker) when Apple exposes it or a lightweight on-device model fits.
 - [ ] Keep summaries (with their time and tokens) in History next to each session.
+- [ ] Serve MCP HTTP requests concurrently (a long summary blocks other clients today).
 - [ ] More UI languages from the community.
 
 ## Debugging
