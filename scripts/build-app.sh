@@ -32,7 +32,10 @@ if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
 fi
 BUNDLE_ID="${BUNDLE_ID:-com.lordbasex.MacDub}"
 # Default: the latest release tag (v0.3.1 → 0.3.1), so local builds don't claim an old version.
-VERSION="${VERSION:-$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')}"
+# CI checkouts have no tags: describe fails there, and under `set -eo pipefail` that must not
+# abort the build.
+VERSION="${VERSION:-$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null || true)}"
+VERSION="${VERSION#v}"
 VERSION="${VERSION:-0.0.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 BUILD_DIR="$ROOT/build"

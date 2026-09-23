@@ -50,7 +50,10 @@ jobs:
         run: make test
 
       - name: Universal .app (ad-hoc signed)
-        run: CODESIGN_IDENTITY=- ./scripts/build-app.sh
+        run: |
+          # The checkout has no tags; name tag builds after the tag, the rest as dev builds.
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then VERSION="${GITHUB_REF_NAME#v}"; else VERSION="0.0.0-dev.${GITHUB_SHA::7}"; fi
+          CODESIGN_IDENTITY=- VERSION="$VERSION" ./scripts/build-app.sh
 
       - name: macOS 26 features compiled ${{ matrix.macos26 && 'in' || 'out' }}
         run: |
