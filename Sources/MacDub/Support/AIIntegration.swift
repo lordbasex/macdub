@@ -293,11 +293,13 @@ enum SummaryService {
             let cli = provider.command.map { "\"\($0)\"" } ?? "claude"
             let r = try Shell.run("\(cli) -p \(shellQuote(instructions)) --output-format json", stdin: transcript)
             guard r.status == 0 else { throw IntegrationError.failed(r.output) }
-            return try claudeResult(r.output) ?? estimated(r.output, input: instructions + transcript)
+            return try parsed(AssistantOutput.claudeCode(r.output), input: instructions + transcript) ?? estimated(r.output, input: instructions + transcript)
         case .codex:
             let cli = provider.command.map { "\"\($0)\"" } ?? "codex"
             let full = instructions + "\n\n---\n\n" + transcript
-            let r = try Shell.run("\(cli) exec --skip-git-repo-check -", stdin: full)
+            let r = try Shell.run("\(cli) exec --json --skip-git-repo-check -", stdin: full)
+            // Older Codex CLIs without --json events: keep the plain output and estimate.
+            if let result = try parsed(AssistantOutput.codexExec(r.output), input: full) { return result }
             guard r.status == 0 else { throw IntegrationError.failed(r.output) }
             return estimated(r.output, input: full)
         case .ollama:
@@ -318,23 +320,14 @@ enum SummaryService {
         SummaryResult(LocalLLM.ChatResult(text: output).estimatingMissing(input: input))
     }
 
-    /// Parses `claude -p --output-format json`: `result` is the reply, `usage` the tokens (input
-    /// includes the prompt cache reads and writes), `total_cost_usd` the cost. The CLI may print
-    /// other lines first, so take the last line that is a JSON object.
-    private static func claudeResult(_ output: String) throws -> SummaryResult? {
-        for line in output.split(separator: "\n").reversed() where line.hasPrefix("{") {
-            guard let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
-                  let text = json["result"] as? String else { continue }
-            if json["is_error"] as? Bool == true { throw IntegrationError.failed(text) }
-            let usage = json["usage"] as? [String: Any] ?? [:]
-            let input = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]
-                .compactMap { usage[$0] as? Int }.reduce(0, +)
-            return SummaryResult(text: text,
-                                 inputTokens: usage.isEmpty ? nil : input,
-                                 outputTokens: usage["output_tokens"] as? Int,
-                                 costUSD: json["total_cost_usd"] as? Double)
+    /// A parsed CLI reply as a summary; a reply flagged as an error becomes the thrown error.
+    private static func parsed(_ p: AssistantOutput.Parsed?, input: String) throws -> SummaryResult? {
+        guard let p else { return nil }
+        if p.isError { throw IntegrationError.failed(p.text) }
+        if p.inputTokens == nil || p.outputTokens == nil {
+            return estimated(p.text, input: input)
         }
-        return nil
+        return SummaryResult(text: p.text, inputTokens: p.inputTokens, outputTokens: p.outputTokens, costUSD: p.costUSD)
     }
 
     private static func shellQuote(_ s: String) -> String {

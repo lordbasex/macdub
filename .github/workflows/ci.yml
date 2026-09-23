@@ -5,19 +5,43 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build, test, package (universal)
-    runs-on: macos-15
+    # One job per macOS SDK the app must build with. The SDK decides what gets compiled:
+    # SpeechAnalyzer and FoundationModels (Apple Intelligence) only exist from the macOS 26 SDK.
+    name: SDK ${{ matrix.sdk }} (Xcode ${{ matrix.xcode }})
+    runs-on: ${{ matrix.runner }}
+    # Xcode 27 runners are a public preview: report, but don't block the other SDKs on them.
+    continue-on-error: ${{ matrix.preview }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sdk: "15", runner: macos-15, xcode: "16.4", macos26: false, preview: false, package: false }
+          - { sdk: "26", runner: macos-26, xcode: "26.6", macos26: true,  preview: false, package: true }
+          - { sdk: "27", runner: xcode-27, xcode: "27",   macos26: true,  preview: true,  package: false }
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app || sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | tail -1)"
+      - name: Select Xcode ${{ matrix.xcode }}
+        run: |
+          app="/Applications/Xcode_${{ matrix.xcode }}.app"
+          [[ -d "$app" ]] || app="$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app 2>/dev/null | sort -V | tail -1)"
+          [[ -d "$app" ]] || { echo "No Xcode ${{ matrix.xcode }} on this runner:"; ls -d /Applications/Xcode*.app; exit 1; }
+          sudo xcode-select -s "$app"
+          swift --version
+          echo "SDK: $(xcrun --show-sdk-version)"
 
-      - name: Swift version
-        run: swift --version
+      - name: Check the SDK major version
+        run: |
+          # swift-flags.sh may move to another SDK; check the one the build will really use.
+          source scripts/swift-flags.sh
+          sdk="$(basename "${SDKROOT:-$(xcrun --show-sdk-path)}")"
+          version="$(xcrun --sdk "${SDKROOT:-macosx}" --show-sdk-version 2>/dev/null || echo "$sdk")"
+          echo "Building with $sdk ($version)"
+          [[ "${version%%.*}" == "${{ matrix.sdk }}" ]] || { echo "::error::expected SDK ${{ matrix.sdk }}, got $version"; exit 1; }
 
       - name: Type-check
         run: make check
@@ -28,7 +52,17 @@ jobs:
       - name: Universal .app (ad-hoc signed)
         run: CODESIGN_IDENTITY=- ./scripts/build-app.sh
 
+      - name: macOS 26 features compiled ${{ matrix.macos26 && 'in' || 'out' }}
+        run: |
+          bin=build/MacDub.app/Contents/MacOS/MacDub
+          if otool -L "$bin" | grep -q FoundationModels.framework; then fm=true; else fm=false; fi
+          if nm "$bin" | grep -q SpeechAnalyzerEngine; then sa=true; else sa=false; fi
+          echo "FoundationModels linked: $fm · SpeechAnalyzerEngine present: $sa"
+          [[ "$fm" == "${{ matrix.macos26 }}" && "$sa" == "${{ matrix.macos26 }}" ]] \
+            || { echo "::error::expected macOS 26 features = ${{ matrix.macos26 }}"; exit 1; }
+
       - name: Zip
+        if: matrix.package
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="dev-${GITHUB_SHA::7}"
@@ -36,19 +70,33 @@ jobs:
           shasum -a 256 "build/MacDub-$VERSION.zip" | tee "build/MacDub-$VERSION.zip.sha256"
 
       - uses: actions/upload-artifact@v4
+        if: matrix.package
         with:
           name: MacDub-universal
           path: |
             build/MacDub-*.zip
             build/MacDub-*.zip.sha256
 
-      # Tagged builds become a draft release; sign + notarize locally with scripts/release.sh
-      # before publishing, or add Developer ID secrets here later.
-      - name: Draft GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  # Tagged builds become a draft release, unless scripts/release.sh already published one
+  # for the tag (it signs, notarizes and uploads the .dmg too).
+  draft-release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
         with:
-          draft: true
-          files: |
-            build/MacDub-*.zip
-            build/MacDub-*.zip.sha256
+          name: MacDub-universal
+          path: build
+      - name: Draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; leaving it as published."
+          else
+            gh release create "$GITHUB_REF_NAME" build/MacDub-*.zip build/MacDub-*.zip.sha256 \
+              --repo "$GITHUB_REPOSITORY" --draft --title "MacDub ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
