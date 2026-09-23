@@ -289,7 +289,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 In priority order, from the 0.3.1 review:
 
 - [ ] Run on macOS 15 — the only engine there is `SFSpeechRecognizer` and there is no Apple Intelligence; tested so far on Apple Silicon (M1, macOS 26.7) and Intel.
-- [ ] Improve `SFSpeechRecognizer` segmentation: it loses ~14 % of the words at run rotations and silence cuts, and speaks half the sentences in pieces.
+- [ ] Improve `SFSpeechRecognizer` segmentation: it loses ~14 % of the words at run rotations and silence cuts, and speaks half the sentences in pieces — [plan](docs/plans/sfspeech-segmentation.md).
 - [ ] Authenticate the app's internal commands (XPC or a shared secret instead of open distributed notifications) and require a token on the MCP HTTP transport by default.
 - [ ] Automated tests for the app and the MCP server: `SessionStore`, MCP tools and HTTP transport, `Shell.run`.
 - [ ] VoiceOver in Settings, the menu bar panel, the floating subtitle bar and the History list, and a full session driven with VoiceOver.
