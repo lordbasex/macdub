@@ -262,35 +262,79 @@ enum SummaryService {
         LocalLLM.summaryInstructions(language: language)
     }
 
+    /// A summary and what it cost. `inputTokens`/`outputTokens` are nil for clipboard-only providers.
+    struct SummaryResult {
+        var text: String
+        var inputTokens: Int?
+        var outputTokens: Int?
+        var tokensEstimated = false
+        var costUSD: Double?
+
+        init(text: String, inputTokens: Int? = nil, outputTokens: Int? = nil, tokensEstimated: Bool = false, costUSD: Double? = nil) {
+            self.text = text
+            self.inputTokens = inputTokens
+            self.outputTokens = outputTokens
+            self.tokensEstimated = tokensEstimated
+            self.costUSD = costUSD
+        }
+
+        init(_ chat: LocalLLM.ChatResult) {
+            self.init(text: chat.text, inputTokens: chat.inputTokens, outputTokens: chat.outputTokens, tokensEstimated: chat.tokensEstimated)
+        }
+    }
+
     /// Runs the summary. Blocking; call off the main thread.
-    static func summarize(_ transcript: String, with provider: SummaryProvider, model: String?, language: String) throws -> String {
+    static func summarize(_ transcript: String, with provider: SummaryProvider, model: String?, language: String) throws -> SummaryResult {
         let instructions = prompt(language: language)
         switch provider.kind {
         case .appleIntelligence:
-            return try LocalLLM.chat(provider: .apple, model: nil, system: instructions, user: transcript)
+            return SummaryResult(try LocalLLM.chatWithUsage(provider: .apple, model: nil, system: instructions, user: transcript))
         case .claudeCode:
             let cli = provider.command.map { "\"\($0)\"" } ?? "claude"
-            let r = try Shell.run("\(cli) -p \(shellQuote(instructions)) --output-format text", stdin: transcript)
+            let r = try Shell.run("\(cli) -p \(shellQuote(instructions)) --output-format json", stdin: transcript)
             guard r.status == 0 else { throw IntegrationError.failed(r.output) }
-            return r.output
+            return try claudeResult(r.output) ?? estimated(r.output, input: instructions + transcript)
         case .codex:
             let cli = provider.command.map { "\"\($0)\"" } ?? "codex"
             let full = instructions + "\n\n---\n\n" + transcript
             let r = try Shell.run("\(cli) exec --skip-git-repo-check -", stdin: full)
             guard r.status == 0 else { throw IntegrationError.failed(r.output) }
-            return r.output
+            return estimated(r.output, input: full)
         case .ollama:
-            return try LocalLLM.chat(provider: .ollama, model: model, system: instructions, user: transcript)
+            return SummaryResult(try LocalLLM.chatWithUsage(provider: .ollama, model: model, system: instructions, user: transcript))
         case .lmStudio:
-            return try LocalLLM.chat(provider: .lmstudio, model: model, system: instructions, user: transcript)
+            return SummaryResult(try LocalLLM.chatWithUsage(provider: .lmstudio, model: model, system: instructions, user: transcript))
         case .claudeDesktop, .chatGPT:
             let text = instructions + "\n\n---\n\n" + transcript
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
             let app = provider.kind == .claudeDesktop ? "Claude" : "ChatGPT"
             NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/\(app).app"))
-            return L("The prompt and transcript were copied to the clipboard — paste them (⌘V) into the assistant that just opened.")
+            return SummaryResult(text: L("The prompt and transcript were copied to the clipboard — paste them (⌘V) into the assistant that just opened."))
         }
+    }
+
+    private static func estimated(_ output: String, input: String) -> SummaryResult {
+        SummaryResult(LocalLLM.ChatResult(text: output).estimatingMissing(input: input))
+    }
+
+    /// Parses `claude -p --output-format json`: `result` is the reply, `usage` the tokens (input
+    /// includes the prompt cache reads and writes), `total_cost_usd` the cost. The CLI may print
+    /// other lines first, so take the last line that is a JSON object.
+    private static func claudeResult(_ output: String) throws -> SummaryResult? {
+        for line in output.split(separator: "\n").reversed() where line.hasPrefix("{") {
+            guard let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                  let text = json["result"] as? String else { continue }
+            if json["is_error"] as? Bool == true { throw IntegrationError.failed(text) }
+            let usage = json["usage"] as? [String: Any] ?? [:]
+            let input = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]
+                .compactMap { usage[$0] as? Int }.reduce(0, +)
+            return SummaryResult(text: text,
+                                 inputTokens: usage.isEmpty ? nil : input,
+                                 outputTokens: usage["output_tokens"] as? Int,
+                                 costUSD: json["total_cost_usd"] as? Double)
+        }
+        return nil
     }
 
     private static func shellQuote(_ s: String) -> String {

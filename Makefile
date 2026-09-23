@@ -22,7 +22,7 @@ setup:
 # and the executable needs it at run time (the CLT case is handled by rpath in Package.swift).
 test:
 	DYLD_FRAMEWORK_PATH="$$(xcode-select -p)/Platforms/MacOSX.platform/Developer/Library/Frameworks" \
-		bash -c 'source scripts/swift-flags.sh && swift run macdub-tests "$${SWIFT_BUILD_FLAGS[@]}"'
+		bash -c 'source scripts/swift-flags.sh && swift run "$${SWIFT_BUILD_FLAGS[@]}" macdub-tests'
 
 all: universal
 

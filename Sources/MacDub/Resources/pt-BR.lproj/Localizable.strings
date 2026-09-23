@@ -338,3 +338,39 @@
 "Audio" = "Áudio";
 "Original under the voice" = "Original sob a voz";
 "Playback: what you hear and which text you read" = "Reprodução: o que você ouve e qual texto lê";
+
+/* Settings · Status */
+"Status" = "Status";
+"Chip" = "Chip";
+"Processor" = "Processador";
+"Memory" = "Memória";
+"System" = "Sistema";
+"Speech recognition" = "Reconhecimento de fala";
+"Apple Intelligence" = "Apple Intelligence";
+"Unknown" = "Desconhecido";
+"x86_64 (Rosetta)" = "x86_64 (Rosetta)";
+"%lld cores (%lld performance + %lld efficiency)" = "%lld núcleos (%lld de desempenho + %lld de eficiência)";
+"%lld cores" = "%lld núcleos";
+"SpeechAnalyzer detected on this Mac." = "SpeechAnalyzer detectado neste Mac.";
+"SpeechAnalyzer not available: %@. Using SFSpeechRecognizer." = "SpeechAnalyzer indisponível: %@. Usando SFSpeechRecognizer.";
+"this build was compiled without the macOS 26 SDK" = "esta versão foi compilada sem o SDK do macOS 26";
+"requires macOS 26" = "requer macOS 26";
+"%@ · running" = "%@ · em uso";
+"SpeechAnalyzer available" = "SpeechAnalyzer disponível";
+"Available (on-device model)" = "Disponível (modelo local)";
+"Turned off in System Settings" = "Desativado nos Ajustes do Sistema";
+"Not supported on this Mac" = "Não compatível com este Mac";
+"Model downloading…" = "Baixando o modelo…";
+"Requires macOS 26" = "Requer macOS 26";
+"Not included in this build" = "Não incluído nesta versão";
+"Unavailable" = "Indisponível";
+"This build was compiled without the macOS 26 SDK: SpeechAnalyzer and Apple Intelligence are disabled even on macOS 26." = "Esta versão foi compilada sem o SDK do macOS 26: SpeechAnalyzer e Apple Intelligence ficam desativados mesmo no macOS 26.";
+
+/* Summary · time and tokens */
+"Summarizing… %@" = "Resumindo… %@";
+"Took %@" = "Levou %@";
+"%@ tokens (%@ in · %@ out)" = "%@ tokens (%@ de entrada · %@ de saída)";
+"≈ estimated: this assistant does not report tokens (about 4 characters per token)." = "≈ estimado: este assistente não informa os tokens (cerca de 4 caracteres por token).";
+
+/* About */
+"Created by %@" = "Criado por %@";

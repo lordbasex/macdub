@@ -32,13 +32,34 @@ public enum LocalLLM {
         return (json["data"] as? [[String: Any]])?.compactMap { $0["id"] as? String } ?? []
     }
 
-    public static var appleAvailable: Bool {
+    public static var appleAvailable: Bool { appleStatus == .available }
+
+    /// Why the on-device Apple Intelligence model can or cannot be used on this Mac.
+    public enum AppleIntelligenceStatus: Sendable {
+        case available
+        case notEnabled          // eligible Mac, Apple Intelligence off in System Settings
+        case deviceNotEligible   // e.g. Intel Macs
+        case modelNotReady       // still downloading / preparing
+        case requiresMacOS26
+        case notInBuild          // built with an SDK without FoundationModels
+        case unknown
+    }
+
+    public static var appleStatus: AppleIntelligenceStatus {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
-            if case .available = SystemLanguageModel.default.availability { return true }
+            switch SystemLanguageModel.default.availability {
+            case .available: return .available
+            case .unavailable(.appleIntelligenceNotEnabled): return .notEnabled
+            case .unavailable(.deviceNotEligible): return .deviceNotEligible
+            case .unavailable(.modelNotReady): return .modelNotReady
+            default: return .unknown
+            }
         }
+        return .requiresMacOS26
+        #else
+        return .notInBuild
         #endif
-        return false
     }
 
     /// Providers usable right now, in preference order (on-device first).
@@ -65,7 +86,41 @@ public enum LocalLLM {
 
     // MARK: Chat
 
+    /// A reply plus the token counts the provider reported (nil when it reports none).
+    public struct ChatResult: Sendable {
+        public var text: String
+        public var inputTokens: Int?
+        public var outputTokens: Int?
+        /// True when the counts are `estimateTokens` guesses rather than the provider's own.
+        public var tokensEstimated: Bool
+
+        public init(text: String, inputTokens: Int? = nil, outputTokens: Int? = nil, tokensEstimated: Bool = false) {
+            self.text = text
+            self.inputTokens = inputTokens
+            self.outputTokens = outputTokens
+            self.tokensEstimated = tokensEstimated
+        }
+
+        /// Fills missing counts with estimates.
+        public func estimatingMissing(input: String) -> ChatResult {
+            guard inputTokens == nil || outputTokens == nil else { return self }
+            return ChatResult(text: text,
+                              inputTokens: inputTokens ?? LocalLLM.estimateTokens(input),
+                              outputTokens: outputTokens ?? LocalLLM.estimateTokens(text),
+                              tokensEstimated: true)
+        }
+    }
+
+    /// Rough, provider-independent token estimate (~4 characters per token).
+    public static func estimateTokens(_ text: String) -> Int {
+        max(1, (text.count + 3) / 4)
+    }
+
     public static func chat(provider: Provider, model: String?, system: String, user: String) throws -> String {
+        try chatWithUsage(provider: provider, model: model, system: system, user: user).text
+    }
+
+    public static func chatWithUsage(provider: Provider, model: String?, system: String, user: String) throws -> ChatResult {
         switch provider {
         case .apple:
             return try appleRespond(system: system, user: user)
@@ -75,7 +130,10 @@ public enum LocalLLM {
                 "model": model, "stream": false,
                 "messages": [["role": "system", "content": system], ["role": "user", "content": user]],
             ])
-            if let text = (json["message"] as? [String: Any])?["content"] as? String { return text }
+            if let text = (json["message"] as? [String: Any])?["content"] as? String {
+                return ChatResult(text: text, inputTokens: json["prompt_eval_count"] as? Int, outputTokens: json["eval_count"] as? Int)
+                    .estimatingMissing(input: system + user)
+            }
             throw Error(errorMessage(json))
         case .lmstudio:
             guard let model else { throw Error("LM Studio needs a model id (see lmStudioModels)") }
@@ -84,23 +142,36 @@ public enum LocalLLM {
                 "messages": [["role": "system", "content": system], ["role": "user", "content": user]],
             ])
             let choices = json["choices"] as? [[String: Any]]
-            if let text = (choices?.first?["message"] as? [String: Any])?["content"] as? String { return text }
+            if let text = (choices?.first?["message"] as? [String: Any])?["content"] as? String {
+                let usage = json["usage"] as? [String: Any]
+                return ChatResult(text: text, inputTokens: usage?["prompt_tokens"] as? Int, outputTokens: usage?["completion_tokens"] as? Int)
+                    .estimatingMissing(input: system + user)
+            }
             throw Error(errorMessage(json))
         }
     }
 
-    private static func appleRespond(system: String, user: String) throws -> String {
+    private static func appleRespond(system: String, user: String) throws -> ChatResult {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
             let semaphore = DispatchSemaphore(value: 0)
-            var result: Result<String, Swift.Error> = .failure(Error("Apple Intelligence is not available"))
+            var result: Result<ChatResult, Swift.Error> = .failure(Error("Apple Intelligence is not available"))
             Task {
                 do {
                     let session = LanguageModelSession(instructions: system)
                     // The on-device context window is small; keep the tail if the text is long.
                     let text = user.count > 12_000 ? String(user.suffix(12_000)) : user
                     let response = try await session.respond(to: text)
-                    result = .success(response.content)
+                    var reply = ChatResult(text: response.content)
+                    // The model's own tokenizer: macOS 26.4 SDK (Swift 6.3 toolchains) and OS.
+                    #if compiler(>=6.3)
+                    if #available(macOS 26.4, *) {
+                        let model = SystemLanguageModel.default
+                        reply.inputTokens = try? await model.tokenCount(for: system + "\n" + text)
+                        reply.outputTokens = try? await model.tokenCount(for: response.content)
+                    }
+                    #endif
+                    result = .success(reply.estimatingMissing(input: system + text))
                 } catch {
                     result = .failure(error)
                 }

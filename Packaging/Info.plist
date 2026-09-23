@@ -33,7 +33,7 @@
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>MIT License</string>
+	<string>© 2026 Federico Pereira &lt;lord.basex@gmail.com&gt; · MIT License</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>MacDub transcribes the captured application audio on-device so it can be translated and dubbed. Nothing leaves your Mac.</string>
 	<key>NSAudioCaptureUsageDescription</key>

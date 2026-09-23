@@ -307,3 +307,39 @@
 "Audio" = "Audio";
 "Original under the voice" = "Original under the voice";
 "Playback: what you hear and which text you read" = "Playback: what you hear and which text you read";
+
+/* Settings · Status */
+"Status" = "Status";
+"Chip" = "Chip";
+"Processor" = "Processor";
+"Memory" = "Memory";
+"System" = "System";
+"Speech recognition" = "Speech recognition";
+"Apple Intelligence" = "Apple Intelligence";
+"Unknown" = "Unknown";
+"x86_64 (Rosetta)" = "x86_64 (Rosetta)";
+"%lld cores (%lld performance + %lld efficiency)" = "%lld cores (%lld performance + %lld efficiency)";
+"%lld cores" = "%lld cores";
+"SpeechAnalyzer detected on this Mac." = "SpeechAnalyzer detected on this Mac.";
+"SpeechAnalyzer not available: %@. Using SFSpeechRecognizer." = "SpeechAnalyzer not available: %@. Using SFSpeechRecognizer.";
+"this build was compiled without the macOS 26 SDK" = "this build was compiled without the macOS 26 SDK";
+"requires macOS 26" = "requires macOS 26";
+"%@ · running" = "%@ · running";
+"SpeechAnalyzer available" = "SpeechAnalyzer available";
+"Available (on-device model)" = "Available (on-device model)";
+"Turned off in System Settings" = "Turned off in System Settings";
+"Not supported on this Mac" = "Not supported on this Mac";
+"Model downloading…" = "Model downloading…";
+"Requires macOS 26" = "Requires macOS 26";
+"Not included in this build" = "Not included in this build";
+"Unavailable" = "Unavailable";
+"This build was compiled without the macOS 26 SDK: SpeechAnalyzer and Apple Intelligence are disabled even on macOS 26." = "This build was compiled without the macOS 26 SDK: SpeechAnalyzer and Apple Intelligence are disabled even on macOS 26.";
+
+/* Summary · time and tokens */
+"Summarizing… %@" = "Summarizing… %@";
+"Took %@" = "Took %@";
+"%@ tokens (%@ in · %@ out)" = "%@ tokens (%@ in · %@ out)";
+"≈ estimated: this assistant does not report tokens (about 4 characters per token)." = "≈ estimated: this assistant does not report tokens (about 4 characters per token).";
+
+/* About */
+"Created by %@" = "Created by %@";

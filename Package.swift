@@ -11,8 +11,11 @@ let usesCLTTesting = !FileManager.default.fileExists(atPath: "/Applications/Xcod
 let testSwiftFlags: [SwiftSetting] = usesCLTTesting
     ? [.unsafeFlags(["-F", cltFrameworks, "-Xfrontend", "-disable-cross-import-overlays"])]
     : []
+// Newer CLTs split lib_TestingInterop.dylib (loaded by Testing.framework) into Developer/usr/lib.
+let cltDevLib = "/Library/Developer/CommandLineTools/Library/Developer/usr/lib"
+let cltRpaths = [cltFrameworks] + (FileManager.default.fileExists(atPath: "\(cltDevLib)/lib_TestingInterop.dylib") ? [cltDevLib] : [])
 let testLinkerFlags: [LinkerSetting] = usesCLTTesting
-    ? [.unsafeFlags(["-F", cltFrameworks, "-Xlinker", "-rpath", "-Xlinker", cltFrameworks])]
+    ? [.unsafeFlags(["-F", cltFrameworks] + cltRpaths.flatMap { ["-Xlinker", "-rpath", "-Xlinker", $0] })]
     : []
 
 let package = Package(

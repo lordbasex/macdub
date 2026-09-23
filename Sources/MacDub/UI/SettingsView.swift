@@ -47,6 +47,7 @@ private struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
+            SystemStatusSection()
             Section("Interface") {
                 Picker("Language", selection: settings.binding(\.interfaceLanguage)) {
                     ForEach(InterfaceLanguage.allCases) { lang in Text(lang.title).tag(lang.rawValue) }
@@ -109,6 +110,78 @@ private struct GeneralSettingsTab: View {
     @State private var confirmFactoryReset = false
 }
 
+/// Recognition engine choice plus what this Mac detected and what is running. Shown under
+/// Capture › Engine and Speech › Recognition.
+private struct RecognitionEnginePicker: View {
+    @EnvironmentObject private var state: AppState
+    private var settings: Settings { state.settings }
+
+    var body: some View {
+        Picker("Recognition engine", selection: settings.binding(\.recognitionEngine)) {
+            ForEach(RecognitionEngineKind.available) { kind in Text(kind.title).tag(kind.rawValue) }
+        }
+        .disabled(state.phase != .idle)
+        .help("Automatic uses SpeechAnalyzer on macOS 26 (better punctuation, lower latency) and falls back to SFSpeechRecognizer otherwise or if it fails.")
+        VStack(alignment: .leading, spacing: 2) {
+            if let reason = RecognitionEngineKind.analyzerUnavailableReason {
+                Text(LF("SpeechAnalyzer not available: %@. Using SFSpeechRecognizer.", reason))
+            } else {
+                Text("SpeechAnalyzer detected on this Mac.")
+            }
+            if let engine = state.activeRecognitionEngine {
+                Text(engine == "analyzer" ? L("Running: SpeechAnalyzer") : L("Running: SFSpeechRecognizer"))
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// Settings › General › Status: the Mac, the OS, and which engines this build can use.
+private struct SystemStatusSection: View {
+    @EnvironmentObject private var state: AppState
+
+    var body: some View {
+        Section("Status") {
+            LabeledContent("Chip", value: SystemInfo.chip)
+            LabeledContent("Processor", value: "\(SystemInfo.cores) · \(SystemInfo.architecture)")
+            LabeledContent("Memory", value: SystemInfo.memory)
+            LabeledContent("System", value: SystemInfo.macOSVersion)
+            LabeledContent("Speech recognition") { recognitionStatus }
+            LabeledContent("Apple Intelligence") { appleIntelligenceStatus }
+            if !SystemInfo.builtWithMacOS26SDK {
+                Text("This build was compiled without the macOS 26 SDK: SpeechAnalyzer and Apple Intelligence are disabled even on macOS 26.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }
+    }
+
+    @ViewBuilder private var recognitionStatus: some View {
+        let running = state.activeRecognitionEngine.map { $0 == "analyzer" ? "SpeechAnalyzer" : "SFSpeechRecognizer" }
+        if RecognitionEngineKind.analyzerSupported {
+            status(ok: true, running.map { LF("%@ · running", $0) } ?? L("SpeechAnalyzer available"))
+        } else {
+            status(ok: false, running.map { LF("%@ · running", $0) } ?? "SFSpeechRecognizer")
+        }
+    }
+
+    @ViewBuilder private var appleIntelligenceStatus: some View {
+        switch LocalLLM.appleStatus {
+        case .available: status(ok: true, L("Available (on-device model)"))
+        case .notEnabled: status(ok: false, L("Turned off in System Settings"))
+        case .deviceNotEligible: status(ok: false, L("Not supported on this Mac"))
+        case .modelNotReady: status(ok: false, L("Model downloading…"))
+        case .requiresMacOS26: status(ok: false, L("Requires macOS 26"))
+        case .notInBuild: status(ok: false, L("Not included in this build"))
+        case .unknown: status(ok: false, L("Unavailable"))
+        }
+    }
+
+    private func status(ok: Bool, _ text: String) -> some View {
+        Label(text, systemImage: ok ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+            .foregroundStyle(ok ? .green : .orange)
+    }
+}
+
 private struct CaptureSettingsTab: View {
     @EnvironmentObject private var state: AppState
     private var settings: Settings { state.settings }
@@ -124,6 +197,7 @@ private struct CaptureSettingsTab: View {
                 if settings.usesProcessTap {
                     Text("The tap needs the app to be playing audio when you press Start.").font(.caption).foregroundStyle(.secondary)
                 }
+                RecognitionEnginePicker()
             }
             if settings.usesProcessTap {
                 Section("Original audio") {
@@ -161,14 +235,7 @@ private struct SpeechSettingsTab: View {
     var body: some View {
         Form {
             Section("Recognition") {
-                Picker("Recognition engine", selection: settings.binding(\.recognitionEngine)) {
-                    ForEach(RecognitionEngineKind.available) { kind in Text(kind.title).tag(kind.rawValue) }
-                }
-                .disabled(state.phase != .idle)
-                .help("Automatic uses SpeechAnalyzer on macOS 26 (better punctuation, lower latency) and falls back to SFSpeechRecognizer otherwise or if it fails.")
-                if let engine = state.activeRecognitionEngine {
-                    Text(engine == "analyzer" ? L("Running: SpeechAnalyzer") : L("Running: SFSpeechRecognizer")).font(.caption).foregroundStyle(.secondary)
-                }
+                RecognitionEnginePicker()
                 LabeledContent("Silence cut-off") {
                     HStack {
                         Slider(value: settings.binding(\.silenceFlushInterval), in: 0.5...3, step: 0.1)

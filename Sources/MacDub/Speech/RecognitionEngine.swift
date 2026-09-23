@@ -38,6 +38,13 @@ enum RecognitionEngineKind: String, CaseIterable, Identifiable {
         return false
     }
 
+    /// Why SpeechAnalyzer can't be used here, or nil when it can.
+    static var analyzerUnavailableReason: String? {
+        if analyzerSupported { return nil }
+        if !SystemInfo.builtWithMacOS26SDK { return L("this build was compiled without the macOS 26 SDK") }
+        return L("requires macOS 26")
+    }
+
     /// Choices shown in the UI: on macOS 15 only "auto" and "legacy" make sense.
     static var available: [RecognitionEngineKind] {
         analyzerSupported ? [.auto, .analyzer, .legacy] : [.auto, .legacy]

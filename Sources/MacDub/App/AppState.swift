@@ -615,7 +615,9 @@ final class AppState: ObservableObject {
     func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
         let credits = NSAttributedString(
-            string: L("Real-time, fully offline dubbing for macOS.") + "\nScreenCaptureKit · Speech · Translation · AVFAudio\n\nMIT License — github.com/lordbasex/macdub",
+            string: L("Real-time, fully offline dubbing for macOS.") + "\nScreenCaptureKit · Speech · Translation · AVFAudio\n\n"
+                + LF("Created by %@", "Federico Pereira <lord.basex@gmail.com>")
+                + "\nMIT License — github.com/lordbasex/macdub",
             attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "MacDub",

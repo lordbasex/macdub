@@ -338,3 +338,39 @@
 "Audio" = "Audio";
 "Original under the voice" = "Original bajo la voz";
 "Playback: what you hear and which text you read" = "Reproducción: qué escuchás y qué texto leés";
+
+/* Settings · Status */
+"Status" = "Estado";
+"Chip" = "Chip";
+"Processor" = "Procesador";
+"Memory" = "Memoria";
+"System" = "Sistema";
+"Speech recognition" = "Reconocimiento de voz";
+"Apple Intelligence" = "Apple Intelligence";
+"Unknown" = "Desconocido";
+"x86_64 (Rosetta)" = "x86_64 (Rosetta)";
+"%lld cores (%lld performance + %lld efficiency)" = "%lld núcleos (%lld de rendimiento + %lld de eficiencia)";
+"%lld cores" = "%lld núcleos";
+"SpeechAnalyzer detected on this Mac." = "SpeechAnalyzer detectado en este Mac.";
+"SpeechAnalyzer not available: %@. Using SFSpeechRecognizer." = "SpeechAnalyzer no disponible: %@. Se usa SFSpeechRecognizer.";
+"this build was compiled without the macOS 26 SDK" = "esta versión se compiló sin el SDK de macOS 26";
+"requires macOS 26" = "requiere macOS 26";
+"%@ · running" = "%@ · en uso";
+"SpeechAnalyzer available" = "SpeechAnalyzer disponible";
+"Available (on-device model)" = "Disponible (modelo local)";
+"Turned off in System Settings" = "Desactivado en Ajustes del Sistema";
+"Not supported on this Mac" = "No compatible con este Mac";
+"Model downloading…" = "Descargando el modelo…";
+"Requires macOS 26" = "Requiere macOS 26";
+"Not included in this build" = "No incluido en esta versión";
+"Unavailable" = "No disponible";
+"This build was compiled without the macOS 26 SDK: SpeechAnalyzer and Apple Intelligence are disabled even on macOS 26." = "Esta versión se compiló sin el SDK de macOS 26: SpeechAnalyzer y Apple Intelligence quedan desactivados aun en macOS 26.";
+
+/* Summary · time and tokens */
+"Summarizing… %@" = "Resumiendo… %@";
+"Took %@" = "Tardó %@";
+"%@ tokens (%@ in · %@ out)" = "%@ tokens (%@ de entrada · %@ de salida)";
+"≈ estimated: this assistant does not report tokens (about 4 characters per token)." = "≈ estimado: este asistente no informa los tokens (unos 4 caracteres por token).";
+
+/* About */
+"Created by %@" = "Creado por %@";

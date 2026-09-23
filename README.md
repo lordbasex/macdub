@@ -17,11 +17,12 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 | **History** — recorded audio with a live spectrum, the transcript following karaoke-style, playback modes ![History with player](images/history.png) | **Subtitles** — transcript options, floating bar and exports ![Subtitles screen](images/subtitles.png) |
 | **AI & MCP** — local summaries and one-click MCP registration ![AI & MCP screen](images/ai-mcp.png) | **Settings** — General, Capture, Speech, Voice, Subtitles, AI & MCP, Permissions ![Settings window](images/settings.png) |
 
-- macOS **15 Sequoia or later** (developed and tested on 15.7.3); ready for macOS 26.
+- macOS **15 Sequoia or later** (developed on 15.7.3, also built and run on macOS 26.7 / Apple M1).
 - Universal binary — Intel and Apple Silicon.
 - Builds **without Xcode**: the Command Line Tools are enough.
 - Interface in English, Spanish and Portuguese (Brazil); easy to add more.
 - MIT licensed. Repository: **https://github.com/lordbasex/macdub**
+- Created by **Federico Pereira** <lord.basex@gmail.com>
 
 ---
 
@@ -34,7 +35,7 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 | | ScreenCaptureKit fallback | Used automatically when the app has no audio process yet (no background mix in that mode). |
 | | Audio buffer for snippets | The last 60 s (configurable in *Settings › AI & MCP*, 0 = off) stay in memory so an assistant can request a WAV excerpt through MCP; never written to disk unless asked. |
 | **Recognition** | On-device speech recognition | `SFSpeechRecognizer` with on-device models (macOS 15+). |
-| | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. |
+| | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. The engine can be picked in *Settings › Capture › Engine*, which also says which one was detected and which one is running. |
 | | Smart sentence segmentation | Cuts on punctuation, clause marks, length, pending time and silence; re-anchors when the recognizer rewrites earlier words. Unit-tested. |
 | **Translation** | On-device translation | Apple's `Translation` framework, 21 languages, models downloaded once. |
 | **Voice** | System voices with quality badges | 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ novelty; per-voice rate and volume; one-click reload after downloading voices. (Siri voices are not available to third-party apps.) |
@@ -49,9 +50,10 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 | | In-app | ⌘R start/stop · ⌘B subtitle bar · ⌘K skip backlog · ⌘L clear (starts a new session) · ⌘E export .srt · ⇧⌘E export .md · ⌘Y history · ⌘, settings. |
 | **Transcripts** | Export | `.srt` (translation / original / both), `.md` with a session header (made for LLMs), `.txt`. File names carry no spaces (`macdub-transcript-<date>.<ext>`). |
 | | Session history (⌘Y) | Every session archived when it stops, with the original audio recorded as AAC (`~/.macdub/audio`). Play it back with a live spectrum while the transcript follows karaoke-style — original audio only, documentary style (original lowered under the translated voice) or translated voice only, with original / translated / both texts, remembered between sessions; export audio + `.srt` under one name (`macdub-audio-<date>.m4a/.srt`) so VLC picks the subtitles up; delete a session and its audio goes with it. Settings › General shows the size of `~/.macdub` and offers *Delete all sessions* and *Factory reset*. |
-| **AI** | Summaries | Claude Code and Codex CLIs, Ollama and LM Studio (choose the model), Apple Intelligence on macOS 26, or paste into Claude Desktop / ChatGPT — in the dubbing target language. |
+| **AI** | Summaries | Claude Code and Codex CLIs, Ollama and LM Studio (choose the model), Apple Intelligence on macOS 26, or paste into Claude Desktop / ChatGPT — in the dubbing target language. A live seconds counter runs while it works; the summary shows how long it took and the tokens used (input/output; exact for Apple Intelligence on 26.4+, Claude Code, Ollama and LM Studio, ≈ estimated for Codex) plus the cost for Claude Code. |
 | | MCP server | 18 tools (including History: list/delete sessions, export audio + `.srt`, storage usage), live resources with push notifications, saved sessions as resources, 3 prompts; stdio and Streamable HTTP transports; server-side summaries with local models; one-click registration for Claude Code, Claude Desktop and Codex that survives moving the app. |
-| **Platform** | Requirements | macOS 15 Sequoia or later (tested on 15.7.3), Intel and Apple Silicon (universal binary). |
+| **Platform** | Requirements | macOS 15 Sequoia or later (tested on 15.7.3 and 26.7), Intel and Apple Silicon (universal binary). |
+| | System status | *Settings › General › Status*: chip, cores (performance + efficiency), memory, macOS version, the speech engine in use and Apple Intelligence availability (with the reason when it is off). |
 | | Build | No Xcode needed — Command Line Tools with Swift 6; `make setup` installs them if missing. No third-party dependencies. |
 | | Languages | Interface in English, Spanish and Portuguese (Brazil); adding one is copying a folder. |
 | | Quality | Unit tests (Swift Testing), CI on GitHub Actions, release script with notarization and Homebrew cask. |
@@ -88,6 +90,8 @@ make test       # unit tests
 `make dmg` needs only macOS tools (`hdiutil`, `SetFile`, `osascript`); the mounted image shows the MacDub icon, a background with an arrow, the app and an Applications shortcut. The Finder layout step asks once for permission to control Finder. `make dmg-native` packs the current `build/MacDub.app` without rebuilding.
 
 There are **no third-party dependencies** — nothing is downloaded. The only requirement is macOS 15+ with the Command Line Tools (Swift ≥ 6.0). On a fresh Mac, `make setup` (or the first `make run`) launches `xcode-select --install` for you, waits for Apple's installer to finish, verifies the SDK and creates the dev signing certificate.
+
+**SDKs.** Builds with the macOS 15, 26 and 27 SDKs. The macOS 27 SDK declares SwiftUI's `@State` as a macro whose plugin the Command Line Tools don't ship; `scripts/swift-flags.sh` notices that and builds against the newest installed SDK that doesn't need it (e.g. 26.5), printing which one. Set `SDKROOT` to override.
 
 **Signing for development.** The build script signs with a self-signed "MacDub Dev" certificate if it exists (created by `make setup` / `scripts/make-dev-cert.sh`), otherwise ad-hoc. Ad-hoc identities change on every build and macOS then drops the Screen Recording grant, so the certificate is worth having.
 
@@ -222,7 +226,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 
 - Latency of roughly 1–3 s is inherent to sentence-by-sentence dubbing.
 - On-device speech languages are limited to those with a downloaded Dictation model (usually the system language plus en-US).
-- `SFSpeechRecognizer` punctuates poorly for fast talkers; `SpeechAnalyzer` (macOS 26) should improve this.
+- `SFSpeechRecognizer` punctuates poorly for fast talkers; on macOS 26 `SpeechAnalyzer` is used instead when available.
 - Safari plays audio through shared WebKit XPC processes; tapping Safari can affect other WebKit apps.
 - No speaker diarization: everyone gets the same voice (the data model has a `speaker` field ready for it).
 - Siri voices cannot be used by third-party apps.
@@ -230,10 +234,28 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 
 ## Roadmap
 
-- [ ] Validate `SpeechAnalyzerEngine` and the Apple Intelligence summarizer on macOS 26 hardware (both are compiled and auto-detected; untested until a macOS 26 machine is available).
-- [ ] Run and profile the arm64 slice on Apple Silicon.
+### Done
+
+- [x] Universal build and `.dmg` on Apple Silicon (M1, macOS 26.7) with the Command Line Tools alone, including the macOS 27 SDK (automatic fallback to an SDK without the `SwiftUIMacros` requirement).
+- [x] `make test` on newer Command Line Tools (build flags passed to the build, `lib_TestingInterop` rpath).
+- [x] `SpeechAnalyzer` detected on macOS 26 and selectable next to the capture engine, with the detected / running engine shown.
+- [x] Apple Intelligence detected as an on-device summary provider on macOS 26.
+- [x] System status in Settings: chip, cores, memory, macOS, speech engine, Apple Intelligence.
+- [x] Summaries show elapsed seconds live and, when done, time, tokens and (Claude Code) cost.
+- [x] Creator credit in *About MacDub*.
+
+### Next
+
+- [ ] Compare `SpeechAnalyzer` and `SFSpeechRecognizer` on macOS 26: punctuation, latency and stability over long sessions.
+- [ ] Profile the arm64 slice (CPU, memory, energy) during long sessions.
+- [ ] Exact token counts for Codex (`codex exec --json`) instead of the estimate.
+- [ ] CI matrix that builds against the macOS 15, 26 and 27 SDKs.
 - [ ] Notarized releases and the Homebrew tap once the Developer ID is available.
+
+### Later
+
 - [ ] Speaker diarization (voice per speaker) when Apple exposes it or a lightweight on-device model fits.
+- [ ] Keep summaries (with their time and tokens) in History next to each session.
 - [ ] More UI languages from the community.
 
 ## Debugging
@@ -246,4 +268,8 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 
 ## License
 
-[MIT](LICENSE) © 2026 lordbasex.
+[MIT](LICENSE) © 2026 Federico Pereira (lordbasex) <lord.basex@gmail.com>.
+
+## Author
+
+Created by **Federico Pereira** — <lord.basex@gmail.com> · [github.com/lordbasex](https://github.com/lordbasex)
