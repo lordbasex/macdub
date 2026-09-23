@@ -151,8 +151,10 @@ enum TranslationCatalog {
         await LanguageAvailability().status(from: source, to: target)
     }
 
+    /// "español (es)", "español (México) (es-MX)". The minimal identifier: the maximal one
+    /// spells out the inferred script and region ("español (latino, España)").
     static func displayName(_ language: Locale.Language) -> String {
-        let id = language.maximalIdentifier
+        let id = language.minimalIdentifier
         let name = Locale.current.localizedString(forIdentifier: id) ?? id
         return "\(name) (\(language.minimalIdentifier))"
     }

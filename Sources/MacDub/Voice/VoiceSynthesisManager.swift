@@ -77,8 +77,11 @@ final class VoiceSynthesisManager: NSObject {
         }
     }
 
+    /// "🟡 Paulina (mejorada) — es-MX". The dot is the quality; macOS already names Enhanced and
+    /// Premium voices in the user's language, so an English "· Enhanced" only repeated it (and
+    /// was what got truncated in narrow pickers). `qualityLabel` stays for the MCP status.
     static func menuTitle(for v: AVSpeechSynthesisVoice) -> String {
-        "\(qualityDot(v)) \(v.name) — \(v.language) · \(qualityLabel(v.quality))"
+        "\(qualityDot(v)) \(v.name) — \(v.language)"
     }
 
     // MARK: Speaking

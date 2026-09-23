@@ -169,8 +169,8 @@ private struct SegmentRow: View {
 
     private var latencyLabel: String {
         var parts: [String] = []
-        if let t = segment.translationLatency { parts.append(String(format: "tr %.1f", t)) }
-        if let s = segment.speechLatency { parts.append(String(format: "spk %.1f", s)) }
+        if let t = segment.translationLatency { parts.append(String(format: "tr %.1f", locale: .current, t)) }
+        if let s = segment.speechLatency { parts.append(String(format: "spk %.1f", locale: .current, s)) }
         return parts.joined(separator: " · ")
     }
 }

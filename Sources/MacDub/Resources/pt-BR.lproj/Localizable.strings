@@ -273,7 +273,7 @@
 "Export…" = "Exportar…";
 "Summarise what was said with the assistant you already have, and let Claude Code, Claude Desktop, Codex or any MCP client read the live transcript." = "Resuma o que foi dito com o assistente que você já tem e deixe o Claude Code, Claude Desktop, Codex ou qualquer cliente MCP ler a transcrição ao vivo.";
 "Summaries with Claude Code, Codex, Ollama, LM Studio or Apple Intelligence" = "Resumos com Claude Code, Codex, Ollama, LM Studio ou Apple Intelligence";
-"MCP server: 18 tools, live resources, prompts" = "Servidor MCP: 16 ferramentas, recursos ao vivo, prompts";
+"MCP server: 18 tools, live resources, prompts" = "Servidor MCP: 18 ferramentas, recursos ao vivo, prompts";
 "Everything stays on this Mac" = "Tudo fica neste Mac";
 "General" = "Geral";
 "Capture" = "Captura";
@@ -374,3 +374,22 @@
 
 /* About */
 "Created by %@" = "Criado por %@";
+
+/* Previously untranslated */
+"Every dubbing session is saved here when it stops." = "Cada sessão de dublagem é salva aqui quando termina.";
+"MCP server: lets Claude Code, Claude Desktop, Codex or any MCP client read the live transcript and control dubbing. Registrations point at a launcher that follows the app if you move it." = "Servidor MCP: permite que Claude Code, Claude Desktop, Codex ou qualquer cliente MCP leia a transcrição ao vivo e controle a dublagem. Os registros apontam para um inicializador que acompanha o app se você o mover.";
+"Seconds of captured audio kept in memory so an assistant can request get_audio_snippet. Never written to disk unless asked." = "Segundos de áudio capturado mantidos na memória para que um assistente possa pedir get_audio_snippet. Nunca é gravado em disco, a menos que seja pedido.";
+"Streamable HTTP transport at http://127.0.0.1:<port>/mcp (localhost only) for clients that cannot spawn a stdio server, or behind a tunnel for remote assistants." = "Transporte Streamable HTTP em http://127.0.0.1:<port>/mcp (somente localhost) para clientes que não conseguem iniciar um servidor stdio, ou atrás de um túnel para assistentes remotos.";
+"Subtitle Bar" = "Barra de legendas";
+
+/* Settings · Permissions · reset */
+"Reset permissions and relaunch…" = "Redefinir permissões e reiniciar…";
+"Forgets MacDub's Screen & System Audio Recording and Speech Recognition grants, relaunches the app and lets macOS ask again. Use it when a permission shows as granted but capture or recognition still fails." = "Apaga as permissões de Gravação de tela e áudio do sistema e de Reconhecimento de fala do MacDub, reinicia o app e deixa o macOS pedi-las de novo. Use quando uma permissão aparece como concedida mas a captura ou o reconhecimento ainda falham.";
+"Reset MacDub's permissions?" = "Redefinir as permissões do MacDub?";
+"Reset and relaunch" = "Redefinir e reiniciar";
+"MacDub relaunches and macOS asks for each permission again. You have to allow them again." = "O MacDub reinicia e o macOS pede cada permissão de novo. Você terá que permiti-las novamente.";
+
+/* Summary providers */
+"Apple Intelligence (on-device)" = "Apple Intelligence (no dispositivo)";
+"Claude Desktop (paste)" = "Claude Desktop (colar)";
+"ChatGPT (paste)" = "ChatGPT (colar)";

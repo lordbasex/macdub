@@ -117,3 +117,57 @@ import MacDubCore
         #expect(s.pendingSince == nil)
     }
 }
+
+@Suite struct ReportedTextTests {
+    @Test func unchangedPrefixIsDropped() {
+        #expect(ReportedText.remainder(of: "It was not that he felt any emotion", after: "It was not") == "that he felt any emotion")
+    }
+
+    // The case the benchmark caught: the character-count trim emitted "er, all emotions, …" twice.
+    @Test func revisedTextIsCutAtTheRightWord() {
+        let reported = "to love for Irene Adler all emotions and that one particular"
+        let revised = "to love for Irene Adler. All emotions, and that one particularly, were abhorrent to his cold,"
+        #expect(ReportedText.remainder(of: revised, after: reported) == "were abhorrent to his cold,")
+    }
+
+    @Test func correctedWordsDoNotShiftTheCut() {
+        let reported = "In his I she eclipses and predomin"
+        let revised = "In his eyes she eclipses and predominates the whole of her sex."
+        #expect(ReportedText.remainder(of: revised, after: reported) == "the whole of her sex.")
+    }
+
+    @Test func nothingReportedKeepsEverything() {
+        #expect(ReportedText.remainder(of: "Hello there.", after: "") == "Hello there.")
+    }
+
+    @Test func fullyReportedLeavesNothing() {
+        #expect(ReportedText.remainder(of: "Hello there.", after: "hello there") == "")
+    }
+
+    @Test func unrelatedResultFallsBackToWordCount() {
+        #expect(ReportedText.remainder(of: "completely different words here now", after: "alpha beta") == "words here now")
+    }
+}
+
+@Suite struct CompletedSentencesTests {
+    private func head(_ text: String) -> String? {
+        ReportedText.endOfCompletedSentences(in: text).map { String(text[..<$0]) }
+    }
+
+    @Test func sentenceFollowedBySpeechIsComplete() {
+        #expect(head("I asked. He said nothing") == "I asked.")
+    }
+
+    @Test func lastOfSeveralCompletedSentences() {
+        #expect(head("Yes. Why? Because it is late! And") == "Yes. Why? Because it is late!")
+    }
+
+    @Test func sentenceStillBeingSpokenIsNot() {
+        #expect(head("He waited for the whole of") == nil)
+        #expect(head("He waited.") == nil)   // nothing after it yet: the final may still revise it
+    }
+
+    @Test func numbersAreNotSentenceEnds() {
+        #expect(head("It costs 3.5 dollars and") == nil)
+    }
+}

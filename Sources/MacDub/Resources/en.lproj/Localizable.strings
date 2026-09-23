@@ -343,3 +343,22 @@
 
 /* About */
 "Created by %@" = "Created by %@";
+
+/* Previously untranslated */
+"Every dubbing session is saved here when it stops." = "Every dubbing session is saved here when it stops.";
+"MCP server: lets Claude Code, Claude Desktop, Codex or any MCP client read the live transcript and control dubbing. Registrations point at a launcher that follows the app if you move it." = "MCP server: lets Claude Code, Claude Desktop, Codex or any MCP client read the live transcript and control dubbing. Registrations point at a launcher that follows the app if you move it.";
+"Seconds of captured audio kept in memory so an assistant can request get_audio_snippet. Never written to disk unless asked." = "Seconds of captured audio kept in memory so an assistant can request get_audio_snippet. Never written to disk unless asked.";
+"Streamable HTTP transport at http://127.0.0.1:<port>/mcp (localhost only) for clients that cannot spawn a stdio server, or behind a tunnel for remote assistants." = "Streamable HTTP transport at http://127.0.0.1:<port>/mcp (localhost only) for clients that cannot spawn a stdio server, or behind a tunnel for remote assistants.";
+"Subtitle Bar" = "Subtitle Bar";
+
+/* Settings · Permissions · reset */
+"Reset permissions and relaunch…" = "Reset permissions and relaunch…";
+"Forgets MacDub's Screen & System Audio Recording and Speech Recognition grants, relaunches the app and lets macOS ask again. Use it when a permission shows as granted but capture or recognition still fails." = "Forgets MacDub's Screen & System Audio Recording and Speech Recognition grants, relaunches the app and lets macOS ask again. Use it when a permission shows as granted but capture or recognition still fails.";
+"Reset MacDub's permissions?" = "Reset MacDub's permissions?";
+"Reset and relaunch" = "Reset and relaunch";
+"MacDub relaunches and macOS asks for each permission again. You have to allow them again." = "MacDub relaunches and macOS asks for each permission again. You have to allow them again.";
+
+/* Summary providers */
+"Apple Intelligence (on-device)" = "Apple Intelligence (on-device)";
+"Claude Desktop (paste)" = "Claude Desktop (paste)";
+"ChatGPT (paste)" = "ChatGPT (paste)";

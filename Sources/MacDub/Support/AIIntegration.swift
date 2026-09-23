@@ -218,7 +218,7 @@ enum SummaryService {
     static func detectProviders() -> [SummaryProvider] {
         var found: [SummaryProvider] = []
         if LocalLLM.appleAvailable {
-            found.append(SummaryProvider(kind: .appleIntelligence, title: "Apple Intelligence (on-device)"))
+            found.append(SummaryProvider(kind: .appleIntelligence, title: L("Apple Intelligence (on-device)")))
         }
         if let claude = newestCLI("claude", extra: ["~/.claude/local/claude", "~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]) {
             found.append(SummaryProvider(kind: .claudeCode, title: "Claude Code (CLI \(claude.version))", command: claude.path))
@@ -230,8 +230,8 @@ enum SummaryService {
         if !ollama.isEmpty { found.append(SummaryProvider(kind: .ollama, title: "Ollama", models: ollama)) }
         let lm = LocalLLM.lmStudioModels()
         if !lm.isEmpty { found.append(SummaryProvider(kind: .lmStudio, title: "LM Studio", models: lm)) }
-        if Shell.appExists("Claude") { found.append(SummaryProvider(kind: .claudeDesktop, title: "Claude Desktop (paste)")) }
-        if Shell.appExists("ChatGPT") { found.append(SummaryProvider(kind: .chatGPT, title: "ChatGPT (paste)")) }
+        if Shell.appExists("Claude") { found.append(SummaryProvider(kind: .claudeDesktop, title: L("Claude Desktop (paste)"))) }
+        if Shell.appExists("ChatGPT") { found.append(SummaryProvider(kind: .chatGPT, title: L("ChatGPT (paste)"))) }
         return found
     }
 

@@ -87,6 +87,8 @@ final class AppState: ObservableObject {
     @Published var isSubtitleBarVisible = false
     /// Section shown in the main window's sidebar.
     @Published var section: AppSection = .dub
+    /// Session to open in History from outside the view (UI snapshots); the view adopts it.
+    @Published var historySelection: String?
 
     /// Where the voice is right now, for karaoke-style highlighting.
     struct SpeakingPosition: Equatable {
@@ -273,10 +275,43 @@ final class AppState: ObservableObject {
         }
         UserDefaults.standard.synchronize()
         Log.app.notice("Factory reset done; relaunching")
-        let relaunch = Process()
-        relaunch.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        relaunch.arguments = ["-n", Bundle.main.bundlePath]
-        try? relaunch.run()
+        relaunch()
+    }
+
+    /// Privacy grants MacDub asks for: Screen & System Audio Recording (ScreenCaptureKit), System
+    /// Audio Recording Only (the Core Audio tap) and Speech Recognition.
+    static let privacyServices = ["ScreenCapture", "AudioCapture", "SpeechRecognition"]
+
+    /// Forgets MacDub's privacy grants (`tccutil reset`, no admin rights needed for the app's own
+    /// bundle id) and relaunches, so macOS asks for each one again. Useful when a grant stops
+    /// being honoured after a rebuild changed the app's signature.
+    func resetPermissionsAndRelaunch() async {
+        await stop()
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.lordbasex.MacDub"
+        for service in Self.privacyServices {
+            let tcc = Process()
+            tcc.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            tcc.arguments = ["reset", service, bundleID]
+            do {
+                try tcc.run()
+                tcc.waitUntilExit()
+                Log.app.notice("tccutil reset \(service, privacy: .public): \(tcc.terminationStatus)")
+            } catch {
+                Log.app.error("tccutil reset \(service, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        relaunch()
+    }
+
+    /// Quits and starts MacDub again. The new copy is launched through LaunchServices (a helper
+    /// process of ours would be killed along with this app) and told which process it replaces,
+    /// so it waits for this one to exit instead of taking it for another instance (`MacDubMain`).
+    func relaunch() {
+        let open = Process()
+        open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        open.arguments = ["-n", Bundle.main.bundlePath, "--args", MacDubMain.relaunchArgument, String(getpid())]
+        try? open.run()
+        open.waitUntilExit()
         NSApp.terminate(nil)
     }
 
@@ -402,6 +437,9 @@ final class AppState: ObservableObject {
                         self.settings.originalVolume = min(1, max(0, level))
                     }
                     if let d = note.userInfo?["duckOnlyWhileSpeaking"] as? String { self.settings.duckOnlyWhileSpeaking = (d == "true") }
+                case .snapshotUI:
+                    guard let path = note.userInfo?["path"] as? String else { return }
+                    await UISnapshots.capture(to: URL(fileURLWithPath: path), label: note.userInfo?["label"] as? String ?? "ui", state: self)
                 case .exportAudio:
                     guard let path = note.userInfo?["path"] as? String else { return }
                     let seconds = Double(note.userInfo?["seconds"] as? String ?? "") ?? 15
@@ -579,7 +617,7 @@ final class AppState: ObservableObject {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private var mainWindow: NSWindow? {
+    var mainWindow: NSWindow? {
         NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(Self.mainWindowID) == true || $0.title == "MacDub" }
     }
 

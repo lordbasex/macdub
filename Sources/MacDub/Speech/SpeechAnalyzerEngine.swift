@@ -1,6 +1,7 @@
 import Foundation
 import Speech
 import AVFAudio
+import MacDubCore
 
 // The SpeechAnalyzer API only exists in the macOS 26 SDK, which ships with Swift 6.2 toolchains.
 // Older Command Line Tools compile the app without this engine (SFSpeechRecognizer is used).
@@ -28,13 +29,23 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
     private var resultsTask: Task<Void, Never>?
     private var converter: AVAudioConverter?
     private var analyzerFormat: AVAudioFormat?
+    /// False until `bestAvailableAudioFormat` answered. Audio arriving before that is held in
+    /// `pending`: yielding it unconverted made the analyzer trap on the unexpected format
+    /// (`SpeechRecognizerWorker.preRunRecognition`, EXC_BREAKPOINT) as soon as it started.
+    private var formatResolved = false
+    private var pending: [AVAudioPCMBuffer] = []
+    private var pendingFrames: AVAudioFramePosition = 0
 
     private let lock = NSLock()
     private var finalized = ""
     private var volatile = ""
-    /// Characters of the in-flight volatile utterance already reported before a `restart()`.
-    private var volatileTrim = 0
+    /// Text of the in-flight volatile utterance already reported before one or more `restart()`s;
+    /// cut out of that utterance's later results (see `ReportedText`).
+    private var reported = ""
     private let maxFinalizedCharacters = 3000
+
+    /// Every result exactly as SpeechAnalyzer reports it, with its audio range (benchmark only).
+    nonisolated(unsafe) static var rawResultHook: ((_ text: String, _ isFinal: Bool, _ range: String) -> Void)?
 
     static func isLocaleInstalled(_ locale: Locale) async -> Bool {
         let installed = await SpeechTranscriber.installedLocales
@@ -66,7 +77,10 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
                 Log.speech.info("SpeechAnalyzer started (\(format?.description ?? "default format", privacy: .public))")
 
                 for try await result in transcriber.results {
-                    self?.handle(text: String(result.text.characters), isFinal: result.isFinal)
+                    let text = String(result.text.characters)
+                    Self.rawResultHook?(text, result.isFinal,
+                                        "\(result.range.start.seconds)+\(result.range.duration.seconds)")
+                    self?.handle(text: text, isFinal: result.isFinal)
                 }
                 self?.onRunEnded?(nil)
             } catch {
@@ -79,18 +93,43 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
     private func setAnalyzerFormat(_ format: AVAudioFormat?) {
         lock.lock()
         analyzerFormat = format
+        formatResolved = true
+        let held = pending
+        pending.removeAll()
+        pendingFrames = 0
         lock.unlock()
+        for buffer in held { append(buffer) }
     }
 
+    /// Segment (and so translate and speak) finalized results only. SpeechAnalyzer's volatile
+    /// results arrive fast but are rough — "the speecheech analyzer", words cut mid-way — and
+    /// its final result for the same audio is a whole, corrected, punctuated sentence ("the
+    /// speech analyzer object with our speech transcriber module."). Volatile text is then only
+    /// shown live (`onVolatile`). Off: the older behaviour, lower latency, rougher text.
+    var segmentsFinalsOnly = true
+    var onVolatile: ((String) -> Void)?
+    /// SpeechAnalyzer sometimes holds a final back until a very long sentence ends, taking the
+    /// short sentences before it along (up to 20 s late in the benchmark). After this long
+    /// without a final, sentences the volatile text has already completed go out anyway; the
+    /// final is later trimmed of them (`reported`).
+    var volatileFallbackAfter: TimeInterval = 5
+    /// When the volatile text now in flight started (first volatile result after a final or a
+    /// promotion); the fallback clock, so a pause in speech never counts as waiting.
+    private var volatileSince: Date?
+
     private func handle(text: String, isFinal: Bool) {
+        if segmentsFinalsOnly {
+            handleFinalsOnly(text: text, isFinal: isFinal)
+            return
+        }
         lock.lock()
-        let trimmed = volatileTrim > 0 ? String(text.dropFirst(min(volatileTrim, text.count))) : text
+        let trimmed = reported.isEmpty ? text : ReportedText.remainder(of: text, after: reported)
         var cumulative: String
         var reportFinal = false
         if isFinal {
             finalized += (finalized.isEmpty || trimmed.isEmpty ? "" : " ") + trimmed
             volatile = ""
-            volatileTrim = 0
+            reported = ""
             cumulative = finalized
             if finalized.count > maxFinalizedCharacters {
                 // Ask the manager to flush and rotate; nothing volatile is in flight right now.
@@ -104,8 +143,57 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         onTranscript?(cumulative, reportFinal)
     }
 
+    private func handleFinalsOnly(text: String, isFinal: Bool) {
+        lock.lock()
+        // Results start with a space (" We're now…"); joining adds one, so drop it.
+        let trimmed = (reported.isEmpty ? text : ReportedText.remainder(of: text, after: reported))
+            .trimmingCharacters(in: .whitespaces)
+        guard isFinal else {
+            var promoted = false
+            let now = Date()
+            if volatileSince == nil { volatileSince = now }
+            if let since = volatileSince, now.timeIntervalSince(since) > volatileFallbackAfter,
+               let end = ReportedText.endOfCompletedSentences(in: trimmed) {
+                let head = trimmed[..<end].trimmingCharacters(in: .whitespaces)
+                if !head.isEmpty {
+                    promoted = true
+                    reported += (reported.isEmpty ? "" : " ") + head
+                    finalized += (finalized.isEmpty ? "" : " ") + head
+                    volatileSince = now
+                }
+            }
+            volatile = promoted ? ReportedText.remainder(of: trimmed, after: reported) : trimmed
+            let shown = volatile, cumulative = finalized
+            let rotate = finalized.count > maxFinalizedCharacters
+            lock.unlock()
+            onVolatile?(shown)
+            if promoted { onTranscript?(cumulative, rotate) }
+            return
+        }
+        finalized += (finalized.isEmpty || trimmed.isEmpty ? "" : " ") + trimmed
+        volatile = ""
+        reported = ""
+        volatileSince = nil
+        let cumulative = finalized
+        let rotate = finalized.count > maxFinalizedCharacters
+        lock.unlock()
+        onVolatile?("")
+        onTranscript?(cumulative, rotate)
+    }
+
     func append(_ buffer: AVAudioPCMBuffer) {
         lock.lock()
+        guard formatResolved else {
+            // Keep up to ~10 s while the model assets are checked; older audio is dropped.
+            pending.append(buffer)
+            pendingFrames += AVAudioFramePosition(buffer.frameLength)
+            while pendingFrames > AVAudioFramePosition(buffer.format.sampleRate * 10), let first = pending.first {
+                pendingFrames -= AVAudioFramePosition(first.frameLength)
+                pending.removeFirst()
+            }
+            lock.unlock()
+            return
+        }
         let format = analyzerFormat
         lock.unlock()
         guard let input else { return }
@@ -134,10 +222,30 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         }
     }
 
-    func restart() {
+    var tailIsVolatile: Bool {
+        lock.lock(); defer { lock.unlock() }
+        // In finals-only mode the manager never sees volatile text.
+        return !segmentsFinalsOnly && !volatile.isEmpty
+    }
+
+    func restart() { restart(holdingBackLastWord: false) }
+
+    func restart(holdingBackLastWord: Bool) {
         lock.lock()
         finalized = ""
-        volatileTrim = volatile.count
+        if segmentsFinalsOnly {
+            // Volatile text was never emitted; its final result will arrive whole.
+            lock.unlock()
+            return
+        }
+        // The utterance's next results repeat everything reported so far, across restarts.
+        // A held-back last word was not emitted, so it stays out of `reported` and comes back.
+        var emitted = volatile
+        if holdingBackLastWord {
+            let trimmed = emitted.trimmingCharacters(in: .whitespaces)
+            emitted = trimmed.lastIndex(where: \.isWhitespace).map { String(trimmed[..<$0]) } ?? ""
+        }
+        if !emitted.isEmpty { reported += (reported.isEmpty ? "" : " ") + emitted }
         volatile = ""
         lock.unlock()
     }
@@ -152,7 +260,8 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         self.analyzer = nil
         transcriber = nil
         lock.lock()
-        finalized = ""; volatile = ""; volatileTrim = 0
+        finalized = ""; volatile = ""; reported = ""; volatileSince = nil
+        pending.removeAll(); pendingFrames = 0
         lock.unlock()
     }
 }

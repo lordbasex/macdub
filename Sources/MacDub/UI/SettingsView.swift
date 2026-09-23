@@ -239,7 +239,7 @@ private struct SpeechSettingsTab: View {
                 LabeledContent("Silence cut-off") {
                     HStack {
                         Slider(value: settings.binding(\.silenceFlushInterval), in: 0.5...3, step: 0.1)
-                        Text(String(format: "%.1f s", settings.silenceFlushInterval)).monospacedDigit().frame(width: 44)
+                        Text(String(format: "%.1f s", locale: .current, settings.silenceFlushInterval)).monospacedDigit().frame(width: 44)
                     }
                 }
                 .help("How long to wait after the speaker pauses before translating the pending words.")
@@ -288,7 +288,7 @@ private struct VoiceSettingsTab: View {
                 LabeledContent("Rate") {
                     HStack {
                         Slider(value: settings.binding(\.speechRate), in: 0.3...0.75)
-                        Text(String(format: "%.2f", settings.speechRate)).monospacedDigit().frame(width: 36)
+                        Text(String(format: "%.2f", locale: .current, settings.speechRate)).monospacedDigit().frame(width: 36)
                     }
                 }
                 LabeledContent("Volume") { Slider(value: settings.binding(\.volume), in: 0.2...1) }
@@ -305,7 +305,7 @@ private struct VoiceSettingsTab: View {
                 LabeledContent("Max delay") {
                     HStack {
                         Slider(value: settings.binding(\.maxSpokenLag), in: 2...15, step: 0.5)
-                        Text(String(format: "%.1f s", settings.maxSpokenLag)).monospacedDigit().frame(width: 44)
+                        Text(String(format: "%.1f s", locale: .current, settings.maxSpokenLag)).monospacedDigit().frame(width: 44)
                     }
                 }
                 .help("Sentences older than this are shown as subtitles but not spoken when the voice is behind.")
@@ -366,6 +366,7 @@ private struct AISettingsTab: View {
 
 private struct PermissionsSettingsTab: View {
     @EnvironmentObject private var state: AppState
+    @State private var confirmResetPermissions = false
 
     var body: some View {
         Form {
@@ -383,6 +384,18 @@ private struct PermissionsSettingsTab: View {
                 if !state.capabilities.screenRecording {
                     Text("After enabling Screen Recording, quit and relaunch MacDub.").font(.caption).foregroundStyle(.secondary)
                 }
+                HStack {
+                    Button("Reset permissions and relaunch…") { confirmResetPermissions = true }
+                        .disabled(state.phase != .idle)
+                    Spacer()
+                }
+                Text("Forgets MacDub's Screen & System Audio Recording and Speech Recognition grants, relaunches the app and lets macOS ask again. Use it when a permission shows as granted but capture or recognition still fails.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .confirmationDialog("Reset MacDub's permissions?", isPresented: $confirmResetPermissions, titleVisibility: .visible) {
+                Button("Reset and relaunch", role: .destructive) { Task { await state.resetPermissionsAndRelaunch() } }
+            } message: {
+                Text("MacDub relaunches and macOS asks for each permission again. You have to allow them again.")
             }
             Section("On-device models") {
                 row("On-device speech model for the spoken language", granted: state.capabilities.sourceOnDevice) {
@@ -403,5 +416,15 @@ private struct PermissionsSettingsTab: View {
             Spacer()
             if !granted { trailing() }
         }
+    }
+}
+
+extension SettingsView {
+    /// Each tab on its own, for `UISnapshots` (the tab structs are private to this file).
+    static var snapshotTabs: [(name: String, view: AnyView)] {
+        [("general", AnyView(GeneralSettingsTab())), ("capture", AnyView(CaptureSettingsTab())),
+         ("speech", AnyView(SpeechSettingsTab())), ("voice", AnyView(VoiceSettingsTab())),
+         ("subtitles", AnyView(SubtitlesSettingsTab())), ("ai", AnyView(AISettingsTab())),
+         ("permissions", AnyView(PermissionsSettingsTab()))]
     }
 }

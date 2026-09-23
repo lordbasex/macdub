@@ -1,5 +1,7 @@
 # MacDub
 
+<p align="center"><img src="graphics/logo.svg" width="128" height="128" alt="MacDub logo: a speech bubble with a waveform on an indigo squircle"></p>
+
 **Real-time, fully offline dubbing for macOS.**
 
 MacDub captures the audio of any app (Zoom, Teams, VLC, Safari, Chrome, Music — or the whole system), transcribes it, translates it and reads the translation aloud with a system voice, keeping the original quietly in the background like a documentary. Everything runs on your Mac with Apple's own frameworks. No cloud, no API keys, no virtual audio drivers, and the microphone is never touched.
@@ -7,6 +9,8 @@ MacDub captures the audio of any app (Zoom, Teams, VLC, Safari, Chrome, Music �
 ![MacDub pipeline: app or system audio → on-device speech recognition → on-device translation → system voice](images/pipeline.png)
 
 ## Screenshots
+
+![A tour of MacDub: Dubbing, Subtitles, History with playback, AI & MCP, the menu bar panel, the floating subtitle bar and every Settings tab](images/macdub-tour.gif)
 
 The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Bring advanced speech-to-text to your app with SpeechAnalyzer*](https://www.youtube.com/watch?v=0m6dimDDj8M) playing in Google Chrome, English → Spanish.
 
@@ -35,7 +39,7 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 | | ScreenCaptureKit fallback | Used automatically when the app has no audio process yet (no background mix in that mode). |
 | | Audio buffer for snippets | The last 60 s (configurable in *Settings › AI & MCP*, 0 = off) stay in memory so an assistant can request a WAV excerpt through MCP; never written to disk unless asked. |
 | **Recognition** | On-device speech recognition | `SFSpeechRecognizer` with on-device models (macOS 15+). |
-| | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. The engine can be picked in *Settings › Capture › Engine*, which also says which one was detected and which one is running. |
+| | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. MacDub translates and speaks its *finalized* results — whole, corrected, punctuated sentences (93 % of sentences in one piece in the [benchmark](docs/benchmarks/), against 35 % segmenting its volatile results) — and shows the volatile text live. The engine can be picked in *Settings › Capture › Engine*, which also says which one was detected and which one is running. |
 | | Smart sentence segmentation | Cuts on punctuation, clause marks, length, pending time and silence; re-anchors when the recognizer rewrites earlier words. Unit-tested. |
 | **Translation** | On-device translation | Apple's `Translation` framework, 21 languages, models downloaded once. |
 | **Voice** | System voices with quality badges | 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ novelty; per-voice rate and volume; one-click reload after downloading voices. (Siri voices are not available to third-party apps.) |
@@ -80,6 +84,7 @@ Grab `MacDub-<version>.dmg` from the [Releases](https://github.com/lordbasex/mac
 git clone https://github.com/lordbasex/macdub.git
 cd macdub
 make setup      # checks macOS 15+, Command Line Tools with Swift 6, SDK frameworks; creates the dev signing cert
+make check      # quick type-check (debug build, no bundle)
 make run        # native-arch build → build/MacDub.app, then launches it
 make            # universal (x86_64 + arm64) build
 make zip        # universal zip to try on another Mac
@@ -91,7 +96,15 @@ make test       # unit tests
 
 There are **no third-party dependencies** — nothing is downloaded. The only requirement is macOS 15+ with the Command Line Tools (Swift ≥ 6.0). On a fresh Mac, `make setup` (or the first `make run`) launches `xcode-select --install` for you, waits for Apple's installer to finish, verifies the SDK and creates the dev signing certificate.
 
-**SDKs.** Builds with the macOS 15, 26 and 27 SDKs. The macOS 27 SDK declares SwiftUI's `@State` as a macro whose plugin the Command Line Tools don't ship; `scripts/swift-flags.sh` notices that and builds against the newest installed SDK that doesn't need it (e.g. 26.5), printing which one. Set `SDKROOT` to override.
+**SDKs.** The same sources build with the macOS 15, 26 and 27 SDKs, with Xcode or with the Command Line Tools alone. CI builds, tests and packages with all three on every push. The SDK decides which macOS 26 features are compiled in; at run time each of them is still checked (`#available`), so a build made with a newer SDK runs on macOS 15 too.
+
+| SDK | Toolchain (CI uses the Xcode listed) | SpeechAnalyzer | Apple Intelligence summaries | Notes |
+|---|---|---|---|---|
+| macOS 15.x | Xcode 16.4 · CLT 16 (Swift 6.0/6.1) | — | — | `SFSpeechRecognizer` only; everything else identical. |
+| macOS 26.x | Xcode 26 · CLT 26 (Swift 6.2+) | ✓ on macOS 26 | ✓ on macOS 26 (exact token counts on 26.4+) | Recommended. |
+| macOS 27.x | Xcode 27 | ✓ on macOS 26+ | ✓ on macOS 26+ | With the **Command Line Tools** only, the 27 SDK's `@State` macro needs a `SwiftUIMacros` plugin the CLT don't ship: `scripts/swift-flags.sh` then builds against the newest installed SDK that doesn't need it (e.g. 26.5) and prints which one. |
+
+Check which SDK a build uses with `xcrun --show-sdk-version`; force one with `SDKROOT=$(xcrun --sdk macosx26.5 --show-sdk-path) make dmg`. *Settings › General › Status* in the app says whether the running build has the macOS 26 features compiled in.
 
 **Signing for development.** The build script signs with a self-signed "MacDub Dev" certificate if it exists (created by `make setup` / `scripts/make-dev-cert.sh`), otherwise ad-hoc. Ad-hoc identities change on every build and macOS then drops the Screen Recording grant, so the certificate is worth having.
 
@@ -202,6 +215,28 @@ Casks/macdub.rb                Homebrew cask (updated by release.sh)
 
 **History playback.** The original audio of each session is recorded as mono AAC while dubbing (a session stopped and resumed keeps one file; the gap is padded with silence so the `.srt` cues stay aligned). `SessionPlayer` plays it through `AVAudioEngine` with an FFT spectrum; in the documentary and voice-only modes the translated voice is not a recording — the player speaks each translation with the same synthesizer as the live dub when its cue starts, so the highlighted word follows the real voice.
 
+## Benchmarks
+
+MacDub's two speech engines were benchmarked on the same audio through the real dubbing pipeline — [Apple M1, 2026-09-23](docs/benchmarks/2026-09-23-apple-m1.md) (28 minutes of speech, one engine at a time):
+
+| | SpeechAnalyzer (macOS 26) | SFSpeechRecognizer |
+|---|---|---|
+| Sentences spoken whole (one segment) | **92 %** | 49 % |
+| Word error rate | **9.7 %** | 31.6 % |
+| Sentence ends found (recall) | **91 %** | 25 % |
+| Questions ending in `?` | **19/26** | 5/22 |
+| Latency, median · p90 | 2.3 s · 4.1 s | 1.1 s · 3.1 s |
+| Speech service CPU (avg) | **5.4 %** | 22.7 % |
+
+Run it on your Mac — especially M2, M3, M4, M5 and M6, which haven't been measured yet — and send the report as a pull request:
+
+```bash
+make benchmark                          # ~1 h: both engines, 30 min of audio each
+scripts/benchmark/run.sh --minutes 10   # quicker
+```
+
+It writes `docs/benchmarks/<date>-<chip>.md` with the machine, the results and [the method](scripts/benchmark/METHOD.md).
+
 ## Tests
 
 ```bash
@@ -227,6 +262,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - Latency of roughly 1–3 s is inherent to sentence-by-sentence dubbing.
 - On-device speech languages are limited to those with a downloaded Dictation model (usually the system language plus en-US).
 - `SFSpeechRecognizer` punctuates poorly for fast talkers; on macOS 26 `SpeechAnalyzer` is used instead when available.
+- With `SpeechAnalyzer` a sentence is spoken once it is complete — about 2.3 s after it ends (median), a little later than `SFSpeechRecognizer`'s fragments, in exchange for whole sentences.
 - Safari plays audio through shared WebKit XPC processes; tapping Safari can affect other WebKit apps.
 - No speaker diarization: everyone gets the same voice (the data model has a `speaker` field ready for it).
 - Siri voices cannot be used by third-party apps.
@@ -236,20 +272,19 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 
 ### Done
 
-- [x] Universal build and `.dmg` on Apple Silicon (M1, macOS 26.7) with the Command Line Tools alone, including the macOS 27 SDK (automatic fallback to an SDK without the `SwiftUIMacros` requirement).
-- [x] `make test` on newer Command Line Tools (build flags passed to the build, `lib_TestingInterop` rpath).
-- [x] `SpeechAnalyzer` detected on macOS 26 and selectable next to the capture engine, with the detected / running engine shown.
-- [x] Apple Intelligence detected as an on-device summary provider on macOS 26.
+- [x] Universal build and `.dmg` on Apple Silicon with the Command Line Tools alone, including the macOS 27 SDK (automatic fallback to an SDK without the `SwiftUIMacros` requirement).
+- [x] CI builds, tests and packages against the macOS 15, 26 and 27 SDKs on every push.
+- [x] `SpeechAnalyzer` vs `SFSpeechRecognizer` compared over long sessions — accuracy, punctuation, whole sentences, latency, CPU and memory ([benchmark](docs/benchmarks/)).
+- [x] SpeechAnalyzer segments whole, corrected sentences (finalized results), so the voice no longer speaks sentences in pieces; crash on early audio fixed.
+- [x] Recognition benchmark anyone can run (`make benchmark`) — results welcome from M2, M3, M4, M5 and M6.
 - [x] System status in Settings: chip, cores, memory, macOS, speech engine, Apple Intelligence.
-- [x] Summaries show elapsed seconds live and, when done, time, tokens and (Claude Code) cost.
-- [x] Creator credit in *About MacDub*.
+- [x] Summaries show elapsed seconds live and, when done, time, exact tokens (Apple Intelligence, Claude Code, Codex, Ollama, LM Studio) and cost (Claude Code); Apple Intelligence summaries fit the model's 4,096-token window.
+- [x] Settings › Permissions: reset MacDub's permissions and relaunch in one click; a single instance of the app at a time.
 
 ### Next
 
-- [ ] Compare `SpeechAnalyzer` and `SFSpeechRecognizer` on macOS 26: punctuation, latency and stability over long sessions.
-- [ ] Profile the arm64 slice (CPU, memory, energy) during long sessions.
-- [ ] Exact token counts for Codex (`codex exec --json`) instead of the estimate.
-- [ ] CI matrix that builds against the macOS 15, 26 and 27 SDKs.
+- [ ] Benchmarks from other Apple Silicon generations (M2–M6) and from real recordings, not only synthesized speech.
+- [ ] Profile a full dubbing session (capture + recognition + translation + voice), Neural Engine energy included (`powermetrics`).
 - [ ] Notarized releases and the Homebrew tap once the Developer ID is available.
 
 ### Later

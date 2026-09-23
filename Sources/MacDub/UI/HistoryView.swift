@@ -16,6 +16,7 @@ struct HistorySectionView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 16) {
                 HeroTile(symbol: "clock.arrow.circlepath", palette: palette, size: 64)
+                    .onReceive(state.$historySelection) { id in if let id { selectedID = id } }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("History").font(.system(size: 30, weight: .semibold)).foregroundStyle(.white)
                     Text("Every dubbing session is saved here when it stops.").foregroundStyle(Theme.secondaryText)

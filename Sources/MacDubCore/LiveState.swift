@@ -136,6 +136,7 @@ public enum MacDubCommand {
         case setSpeak          // enabled: "true"/"false"
         case setOriginalVolume // level: 0…1, duckOnlyWhileSpeaking?: "true"/"false"
         case exportAudio       // seconds, path → the app writes a 16 kHz mono WAV of the last N seconds
+        case snapshotUI        // path, label → PNGs of every screen (light + dark), then <label>.done
     }
 
     public static func post(_ action: Action, bundleIdentifier: String? = nil, values: [String: String] = [:]) {

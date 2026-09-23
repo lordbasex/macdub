@@ -273,7 +273,7 @@
 "Export…" = "Exportar…";
 "Summarise what was said with the assistant you already have, and let Claude Code, Claude Desktop, Codex or any MCP client read the live transcript." = "Resume lo que se dijo con el asistente que ya tienes, y deja que Claude Code, Claude Desktop, Codex o cualquier cliente MCP lean la transcripción en vivo.";
 "Summaries with Claude Code, Codex, Ollama, LM Studio or Apple Intelligence" = "Resúmenes con Claude Code, Codex, Ollama, LM Studio o Apple Intelligence";
-"MCP server: 18 tools, live resources, prompts" = "Servidor MCP: 16 herramientas, recursos en vivo, prompts";
+"MCP server: 18 tools, live resources, prompts" = "Servidor MCP: 18 herramientas, recursos en vivo, prompts";
 "Everything stays on this Mac" = "Todo se queda en este Mac";
 "General" = "General";
 "Capture" = "Captura";
@@ -337,7 +337,7 @@
 "Both" = "Ambos";
 "Audio" = "Audio";
 "Original under the voice" = "Original bajo la voz";
-"Playback: what you hear and which text you read" = "Reproducción: qué escuchás y qué texto leés";
+"Playback: what you hear and which text you read" = "Reproducción: qué escuchas y qué texto lees";
 
 /* Settings · Status */
 "Status" = "Estado";
@@ -374,3 +374,22 @@
 
 /* About */
 "Created by %@" = "Creado por %@";
+
+/* Previously untranslated */
+"Every dubbing session is saved here when it stops." = "Cada sesión de doblaje se guarda acá cuando se detiene.";
+"MCP server: lets Claude Code, Claude Desktop, Codex or any MCP client read the live transcript and control dubbing. Registrations point at a launcher that follows the app if you move it." = "Servidor MCP: permite que Claude Code, Claude Desktop, Codex o cualquier cliente MCP lea la transcripción en vivo y controle el doblaje. Los registros apuntan a un lanzador que sigue a la app si la mueves.";
+"Seconds of captured audio kept in memory so an assistant can request get_audio_snippet. Never written to disk unless asked." = "Segundos de audio capturado que se guardan en memoria para que un asistente pueda pedir get_audio_snippet. Nunca se escribe en disco salvo que se pida.";
+"Streamable HTTP transport at http://127.0.0.1:<port>/mcp (localhost only) for clients that cannot spawn a stdio server, or behind a tunnel for remote assistants." = "Transporte Streamable HTTP en http://127.0.0.1:<port>/mcp (solo localhost) para clientes que no pueden lanzar un servidor stdio, o detrás de un túnel para asistentes remotos.";
+"Subtitle Bar" = "Barra de subtítulos";
+
+/* Settings · Permissions · reset */
+"Reset permissions and relaunch…" = "Borrar permisos y reiniciar…";
+"Forgets MacDub's Screen & System Audio Recording and Speech Recognition grants, relaunches the app and lets macOS ask again. Use it when a permission shows as granted but capture or recognition still fails." = "Borra los permisos de Grabación de pantalla y audio del sistema y de Reconocimiento de voz de MacDub, reinicia la app y deja que macOS los vuelva a pedir. Úsalo cuando un permiso figura como otorgado pero la captura o el reconocimiento igual fallan.";
+"Reset MacDub's permissions?" = "¿Borrar los permisos de MacDub?";
+"Reset and relaunch" = "Borrar y reiniciar";
+"MacDub relaunches and macOS asks for each permission again. You have to allow them again." = "MacDub se reinicia y macOS vuelve a pedir cada permiso. Tendrás que permitirlos de nuevo.";
+
+/* Summary providers */
+"Apple Intelligence (on-device)" = "Apple Intelligence (en el dispositivo)";
+"Claude Desktop (paste)" = "Claude Desktop (pegar)";
+"ChatGPT (paste)" = "ChatGPT (pegar)";

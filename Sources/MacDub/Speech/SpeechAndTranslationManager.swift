@@ -2,6 +2,7 @@ import MacDubCore
 import Foundation
 import Speech
 import AVFAudio
+import Accelerate
 
 /// Stage 2 of the pipeline: on-device speech recognition + on-device translation.
 ///
@@ -15,6 +16,8 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     var onSegmentRecognized: ((Segment) -> Void)?
     var onSegmentTranslated: ((Segment) -> Void)?
     var onFatalError: ((Error) -> Void)?
+    /// Every cumulative transcript the engine reports, before segmentation (benchmark/debugging).
+    var onRawTranscript: ((_ text: String, _ isFinal: Bool) -> Void)?
 
     /// Emit uncommitted text after this much time without new partial results.
     var silenceFlushInterval: TimeInterval = 0.9
@@ -35,6 +38,19 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     private var timer: DispatchSourceTimer?
     private var isRunning = false
     private var recentFailures: [Date] = []
+    /// Provisional text from engines that segment finals only, shown after the pending text.
+    private var volatileTail = ""
+    /// SpeechAnalyzer: segment finalized results only (see `SpeechAnalyzerEngine.segmentsFinalsOnly`).
+    var analyzerFinalsOnly = true
+
+    /// Last time a captured buffer had sound in it (peak above `soundThreshold`); written from
+    /// the capture thread, read on `queue`.
+    private var lastSoundAt = Date()
+    private let soundLock = NSLock()
+    private let soundThreshold: Float = 0.01  // ≈ −40 dBFS
+    /// SpeechAnalyzer reports text in bursts every few seconds, so a pause in *text* is not a
+    /// pause in speech. For it a silence cut also needs quiet *audio*, or text stalled this long.
+    private let analyzerStallFlush: TimeInterval = 6
 
     init(translator: TranslationBridge) {
         self.translator = translator
@@ -86,6 +102,7 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
             self.engineKind = kind
             self.sourceLocale = sourceLocale
             self.receivedTranscript = false
+            self.volatileTail = ""
             self.segmenter = TranscriptSegmenter()
             self.segmenter.silenceFlushInterval = self.silenceFlushInterval
             self.isRunning = true
@@ -99,13 +116,23 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         var engine: RecognitionEngine = SFSpeechEngine()
         #if compiler(>=6.2)
         if kind == .analyzer, #available(macOS 26.0, *) {
-            engine = SpeechAnalyzerEngine()
+            let analyzer = SpeechAnalyzerEngine()
+            analyzer.segmentsFinalsOnly = analyzerFinalsOnly
+            engine = analyzer
         }
         #endif
         engine.onTranscript = { [weak self, weak engine] text, isFinal in
             self?.queue.async {
                 guard let self, self.engine === engine else { return }
                 self.handleTranscript(text, isFinal: isFinal)
+            }
+        }
+        engine.onVolatile = { [weak self, weak engine] text in
+            self?.queue.async {
+                guard let self, self.engine === engine, self.isRunning else { return }
+                self.volatileTail = text
+                if !text.isEmpty { self.receivedTranscript = true }
+                self.onPartial?(self.livePartial)
             }
         }
         engine.onRunEnded = { [weak self, weak engine] error in
@@ -142,6 +169,7 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
             self.timer?.cancel()
             self.timer = nil
             if let rest = self.segmenter.flush() { self.emit(rest) }
+            self.volatileTail = ""
             self.onPartial?("")
             self.engine?.stop()
             self.engine = nil
@@ -152,16 +180,31 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
 
     /// Feed captured audio. Safe to call from any thread.
     func append(_ buffer: AVAudioPCMBuffer) {
+        if let samples = buffer.floatChannelData, buffer.frameLength > 0 {
+            var peak: Float = 0
+            vDSP_maxmgv(samples[0], 1, &peak, vDSP_Length(buffer.frameLength))
+            if peak > soundThreshold {
+                soundLock.lock(); lastSoundAt = Date(); soundLock.unlock()
+            }
+        }
         engine?.append(buffer)
+    }
+
+    /// Whether a pause in the transcript really is a pause in speech (see `analyzerStallFlush`).
+    private func silenceConfirmed(now: Date) -> Bool {
+        guard engineKind == .analyzer else { return true }
+        soundLock.lock(); let quietFor = now.timeIntervalSince(lastSoundAt); soundLock.unlock()
+        return quietFor >= silenceFlushInterval || now.timeIntervalSince(segmenter.lastUpdate) >= analyzerStallFlush
     }
 
     // MARK: Engine events (on queue)
 
     private func handleTranscript(_ text: String, isFinal: Bool) {
         guard isRunning else { return }
+        onRawTranscript?(text, isFinal)
         if !text.isEmpty { receivedTranscript = true }
         for chunk in segmenter.update(transcript: text) { emit(chunk) }
-        onPartial?(segmenter.uncommitted)
+        onPartial?(livePartial)
         if isFinal { rotate(reason: "final") }
     }
 
@@ -185,13 +228,35 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         rotate(reason: error == nil ? "run ended" : "error")
     }
 
+    /// What is still being heard: pending text plus any provisional tail.
+    private var livePartial: String {
+        let pending = segmenter.uncommitted
+        guard !volatileTail.isEmpty else { return pending }
+        return pending.isEmpty ? volatileTail : pending + " " + volatileTail
+    }
+
     /// Emit whatever is pending, then begin a fresh run.
     private func rotate(reason: String) {
         guard isRunning else { return }
-        if let rest = segmenter.flush() { emit(rest) }
+        onRawTranscript?("<rotate: \(reason)>", false)
+        var holdBack = false
+        if let rest = segmenter.flush() {
+            // A provisional tail may end mid-word ("predomin"): keep its last word for the next
+            // run instead of emitting a fragment, unless the text ends a sentence or clause.
+            if engine?.tailIsVolatile == true, let last = rest.last, !".?!,;:".contains(last),
+               let cut = rest.lastIndex(where: \.isWhitespace) {
+                holdBack = true
+                let head = rest[..<cut].trimmingCharacters(in: .whitespaces)
+                if !head.isEmpty { emit(head) }
+            } else if engine?.tailIsVolatile == true, let last = rest.last, !".?!,;:".contains(last) {
+                holdBack = true  // a single provisional word: wait for it to finish
+            } else {
+                emit(rest)
+            }
+        }
         onPartial?("")
         segmenter.reset()
-        engine?.restart()
+        engine?.restart(holdingBackLastWord: holdBack)
         Log.speech.debug("Rotated recognition run (\(reason, privacy: .public))")
     }
 
@@ -228,11 +293,11 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     private func tick() {
         guard isRunning, let engine else { return }
         let now = Date()
-        if segmenter.shouldFlushForSilence(now: now) {
+        if segmenter.shouldFlushForSilence(now: now), silenceConfirmed(now: now) {
             rotate(reason: "silence")
         } else if let chunk = segmenter.cutByTime(now: now) {
             emit(chunk)
-            onPartial?(segmenter.uncommitted)
+            onPartial?(livePartial)
         } else if engine.needsPeriodicRestart, now.timeIntervalSince(segmenter.runStartedAt) > maxTaskDuration {
             rotate(reason: "max duration")
         }

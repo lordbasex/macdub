@@ -11,7 +11,7 @@
 #
 # Variables you can override: CODESIGN_IDENTITY, BUNDLE_ID, VERSION, ARCHS, CONFIG.
 
-.PHONY: all setup universal run debug check test clean reset-permissions notarize release zip dmg dmg-native
+.PHONY: all setup universal run debug check test benchmark clean reset-permissions notarize release zip dmg dmg-native
 
 setup:
 	./scripts/setup.sh
@@ -34,6 +34,11 @@ run:
 
 debug:
 	CONFIG=debug ./scripts/run.sh
+
+# Speech recognition benchmark (both engines in real time, ~1 h): writes docs/benchmarks/<date>-<chip>.md.
+# See scripts/benchmark/METHOD.md. `scripts/benchmark/run.sh --minutes 10` for a quicker run.
+benchmark:
+	./scripts/benchmark/run.sh
 
 check:
 	bash -c 'source scripts/swift-flags.sh && swift build "$${SWIFT_BUILD_FLAGS[@]}"'

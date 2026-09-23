@@ -17,7 +17,7 @@ struct MenuBarPanelView: View {
             VStack(spacing: 12) {
                 header
                 HStack(spacing: 10) {
-                    tile("Latency", value: state.latency.samples > 0 ? String(format: "%.1f s", state.latency.spoken) : "—",
+                    tile("Latency", value: state.latency.samples > 0 ? String(format: "%.1f s", locale: .current, state.latency.spoken) : "—",
                          detail: state.latency.samples > 0 ? LF("translate %.1f s", state.latency.translation) : L("no data yet"), symbol: "timer")
                     tile("Voice", value: state.voices.first { $0.identifier == settings.voiceIdentifier }?.name ?? "—",
                          detail: settings.speakTranslation ? L("speaking") : L("muted"), symbol: "speaker.wave.2.fill")

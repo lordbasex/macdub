@@ -21,6 +21,22 @@ protocol RecognitionEngine: AnyObject {
     /// Begin a new run; the manager has already flushed the previous one.
     func restart()
     func stop()
+
+    /// Provisional text not yet part of `onTranscript` (engines that segment finals only), for
+    /// showing live; "" when it was finalized.
+    var onVolatile: ((String) -> Void)? { get set }
+
+    /// True when the end of the current transcript is still provisional (it may grow, e.g.
+    /// "predomin" → "predominates"). Engines that report finished words only return false.
+    var tailIsVolatile: Bool { get }
+    /// `restart()`, except that the last word of the volatile tail was *not* emitted by the
+    /// manager: it must come back at the start of the next results.
+    func restart(holdingBackLastWord: Bool)
+}
+
+extension RecognitionEngine {
+    var tailIsVolatile: Bool { false }
+    func restart(holdingBackLastWord: Bool) { restart() }
 }
 
 enum RecognitionEngineKind: String, CaseIterable, Identifiable {
@@ -76,6 +92,7 @@ enum RecognitionEngineKind: String, CaseIterable, Identifiable {
 final class SFSpeechEngine: RecognitionEngine {
     var onTranscript: ((String, Bool) -> Void)?
     var onRunEnded: ((Error?) -> Void)?
+    var onVolatile: ((String) -> Void)?  // SFSpeechRecognizer's partials go through onTranscript
     let needsPeriodicRestart = true
 
     private var recognizer: SFSpeechRecognizer?

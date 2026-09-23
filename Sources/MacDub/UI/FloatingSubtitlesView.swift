@@ -151,7 +151,7 @@ struct QuickSettingsView: View {
             LabeledContent("Max delay") {
                 HStack {
                     Slider(value: settings.binding(\.maxSpokenLag), in: 2...15, step: 0.5)
-                    Text(String(format: "%.1f s", settings.maxSpokenLag)).monospacedDigit().frame(width: 40)
+                    Text(String(format: "%.1f s", locale: .current, settings.maxSpokenLag)).monospacedDigit().frame(width: 40)
                 }
             }
 

@@ -188,7 +188,7 @@ let tools: [Tool] = [
             let sessionStart: Date
             let meta: TranscriptExporter.Metadata
             let targetLanguage: String
-            if let id = args["sessionId"] as? String {
+            if let id = (args["sessionId"] ?? args["id"]) as? String {  // `id`, as get_session calls it
                 guard let record = try? SessionStore.load(id: id) else { throw ToolError.notFound("No session with id \(id)") }
                 segments = record.segments.map(\.segment); sessionStart = record.startedAt; meta = record.metadata; targetLanguage = record.targetLanguage
             } else {
@@ -228,7 +228,7 @@ let tools: [Tool] = [
         name: "export_session",
         description: "Write the current session (or a saved one with `sessionId`) to a file on disk as srt, md or txt, so the assistant can keep working with the file (e.g. hand a subtitle track to a video). Format `audio` (saved sessions with recorded audio only) copies the original audio as `<name>.m4a` and writes `<name>.srt` next to it with the same name, so VLC and other players load the subtitles automatically. `path` defaults to ~/Downloads/macdub-transcript-<date>.<ext> (or macdub-audio-<date>.m4a). Returns the absolute path(s).",
         schema: ["type": "object", "properties": [
-            "sessionId": ["type": "string"],
+            "sessionId": ["type": "string", "description": "A saved session (list_sessions); `id` is accepted too"],
             "format": ["type": "string", "enum": ["srt", "md", "txt", "audio"], "description": "Default srt. `audio` = .m4a + .srt pair"],
             "content": contentProperty,
             "path": ["type": "string", "description": "Destination file (~ allowed). Parent folders are created. For `audio`, the .srt takes the same name."],
@@ -239,7 +239,7 @@ let tools: [Tool] = [
             let sessionStart: Date
             let meta: TranscriptExporter.Metadata
             var record: SessionRecord?
-            if let id = args["sessionId"] as? String {
+            if let id = (args["sessionId"] ?? args["id"]) as? String {  // `id`, as get_session calls it
                 guard let r = try? SessionStore.load(id: id) else { throw ToolError.notFound("No session with id \(id)") }
                 record = r
                 segments = r.segments.map(\.segment); sessionStart = r.startedAt; meta = r.metadata

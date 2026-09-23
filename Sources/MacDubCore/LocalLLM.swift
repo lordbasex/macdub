@@ -151,6 +151,36 @@ public enum LocalLLM {
         }
     }
 
+    /// Characters kept when the model's tokenizer isn't available (< macOS 26.4): ~2,500 tokens
+    /// of transcript Markdown, which spends a token per ~3.5 characters.
+    static let appleFallbackCharacters = 9_000
+    /// Tokens left for the reply: summaries measured 220–430 tokens; keep room for longer ones.
+    static let appleReplyReserve = 900
+
+    /// The on-device model has a 4,096-token window that holds the instructions, the transcript
+    /// *and* the reply. 12,000 characters of a real transcript measured 3,371 tokens — with the
+    /// reply that left ~140 tokens to spare, and denser languages would not fit. So the transcript
+    /// is cut to what fits, counted with the model's own tokenizer, keeping the most recent part.
+    private static func appleFit(_ text: String, instructions: String) async -> String {
+        #if canImport(FoundationModels) && compiler(>=6.3)
+        if #available(macOS 26.4, *) {
+            let model = SystemLanguageModel.default
+            if let fixed = try? await model.tokenCount(for: instructions) {
+                let budget = model.contextSize - fixed - appleReplyReserve
+                var keep = text.count
+                // Shrink proportionally until it fits (usually one or two rounds).
+                for _ in 0..<6 {
+                    let candidate = keep < text.count ? String(text.suffix(keep)) : text
+                    guard let tokens = try? await model.tokenCount(for: candidate) else { break }
+                    if tokens <= budget { return candidate }
+                    keep = Int(Double(keep) * Double(budget) / Double(tokens) * 0.95)
+                }
+            }
+        }
+        #endif
+        return text.count > appleFallbackCharacters ? String(text.suffix(appleFallbackCharacters)) : text
+    }
+
     private static func appleRespond(system: String, user: String) throws -> ChatResult {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
@@ -159,8 +189,7 @@ public enum LocalLLM {
             Task {
                 do {
                     let session = LanguageModelSession(instructions: system)
-                    // The on-device context window is small; keep the tail if the text is long.
-                    let text = user.count > 12_000 ? String(user.suffix(12_000)) : user
+                    let text = await appleFit(user, instructions: system)
                     let response = try await session.respond(to: text)
                     var reply = ChatResult(text: response.content)
                     // The model's own tokenizer: macOS 26.4 SDK (Swift 6.3 toolchains) and OS.

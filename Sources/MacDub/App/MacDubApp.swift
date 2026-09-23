@@ -1,6 +1,43 @@
 import SwiftUI
+import AppKit
 
+/// Entry point: the headless recognition benchmark (see `RecognitionBenchmark`) runs before
+/// anything of the app — `AppState`, windows, capture — is created.
 @main
+enum MacDubMain {
+    static func main() {
+        if RecognitionBenchmark.isRequested { RecognitionBenchmark.runAndExit() }
+        waitForReplacedInstance()
+        if let running = otherInstance() {
+            // Two instances would capture, recognize and speak the same audio twice and fight
+            // over the MCP live state; bring the running one forward instead.
+            running.activate()
+            exit(0)
+        }
+        MacDubApp.main()
+    }
+
+    /// `--relaunched-from <pid>`: this copy replaces that process (see `AppState.relaunch`).
+    static let relaunchArgument = "--relaunched-from"
+
+    /// When relaunched, wait (up to 15 s) for the old process to finish quitting.
+    private static func waitForReplacedInstance() {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: relaunchArgument), i + 1 < args.count, let pid = pid_t(args[i + 1]) else { return }
+        let deadline = Date().addingTimeInterval(15)
+        while kill(pid, 0) == 0, Date() < deadline { usleep(100_000) }
+    }
+
+    /// Another MacDub already running for this user (any copy of the app: build/, /Applications…).
+    /// Benchmark runs never finish launching (no UI), so they don't count.
+    private static func otherInstance() -> NSRunningApplication? {
+        guard let id = Bundle.main.bundleIdentifier else { return nil }
+        return NSRunningApplication.runningApplications(withBundleIdentifier: id).first {
+            $0.processIdentifier != getpid() && $0.isFinishedLaunching && !$0.isTerminated
+        }
+    }
+}
+
 struct MacDubApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var state = AppState.shared
