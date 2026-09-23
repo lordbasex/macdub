@@ -40,11 +40,18 @@ APP="$BUILD_DIR/$APP_NAME.app"
 # with Xcode. Building one slice at a time and merging with lipo works with the CLT alone.
 SLICES=()
 MCP_SLICES=()
+# Build-system flags (see scripts/swift-flags.sh): the classic build system, and the SDK's
+# macro plugins. Newer toolchains default to the "Swift Build" backend, which does not hand the
+# compiler the SDK plugin folder where SwiftUIMacros lives — every @State then fails with
+# "plugin for module 'SwiftUIMacros' not found" (seen with the macOS 26 SDK on Apple Silicon).
+# shellcheck source=swift-flags.sh
+source "$ROOT/scripts/swift-flags.sh"
+
 for a in $ARCHS; do
-  echo "▶ swift build -c $CONFIG --arch $a"
-  swift build -c "$CONFIG" --arch "$a" --package-path "$ROOT" --product "$APP_NAME"
-  swift build -c "$CONFIG" --arch "$a" --package-path "$ROOT" --product macdub-mcp
-  BIN="$(swift build -c "$CONFIG" --arch "$a" --package-path "$ROOT" --show-bin-path)"
+  echo "▶ swift build -c $CONFIG --arch $a ${SWIFT_BUILD_FLAGS[*]}"
+  swift build -c "$CONFIG" --arch "$a" --package-path "$ROOT" --product "$APP_NAME" "${SWIFT_BUILD_FLAGS[@]}"
+  swift build -c "$CONFIG" --arch "$a" --package-path "$ROOT" --product macdub-mcp "${SWIFT_BUILD_FLAGS[@]}"
+  BIN="$(swift build -c "$CONFIG" --arch "$a" --package-path "$ROOT" --show-bin-path "${SWIFT_BUILD_FLAGS[@]}")"
   SLICES+=("$BIN/$APP_NAME")
   MCP_SLICES+=("$BIN/macdub-mcp")
 done
@@ -68,7 +75,7 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 # Localizations: SwiftPM emits them inside MacDub_MacDub.bundle; placing the .lproj folders
 # directly in Contents/Resources lets Bundle.main (and plain SwiftUI Text) find them.
 LAST_ARCH="${ARCHS##* }"
-RES_BUNDLE="$(swift build -c "$CONFIG" --arch "$LAST_ARCH" --package-path "$ROOT" --show-bin-path)/MacDub_MacDub.bundle"
+RES_BUNDLE="$(swift build -c "$CONFIG" --arch "$LAST_ARCH" --package-path "$ROOT" --show-bin-path "${SWIFT_BUILD_FLAGS[@]}")/MacDub_MacDub.bundle"
 if [[ -d "$RES_BUNDLE" ]]; then
   find "$RES_BUNDLE" -name '*.lproj' -type d -maxdepth 3 -exec cp -R {} "$APP/Contents/Resources/" \;
 fi

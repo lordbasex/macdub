@@ -4,7 +4,7 @@
 # `scripts/release.sh` rewrites `version` and `sha256` on every release.
 cask "macdub" do
   version "0.1.0"
-  sha256 "c9135e8a517f5d34bf584871a1b1474deb8ba3aed3a2b7d23679c5ea06ff09cf"
+  sha256 "f4bbfd787c782bd07ffd5cdc71732ef870211e62495270884125856bd4372a8f"
 
   url "https://github.com/lordbasex/macdub/releases/download/v#{version}/MacDub-#{version}.zip"
   name "MacDub"

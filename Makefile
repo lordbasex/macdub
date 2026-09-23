@@ -18,8 +18,11 @@ setup:
 
 # Unit tests (Swift Testing). An executable runner instead of `swift test`, because the
 # Command Line Tools lack Xcode's xctest loader — see Tests/Runner/main.swift.
+# With Xcode selected, Testing.framework lives in the platform's Developer/Library/Frameworks
+# and the executable needs it at run time (the CLT case is handled by rpath in Package.swift).
 test:
-	swift run macdub-tests
+	DYLD_FRAMEWORK_PATH="$$(xcode-select -p)/Platforms/MacOSX.platform/Developer/Library/Frameworks" \
+		bash -c 'source scripts/swift-flags.sh && swift run macdub-tests "$${SWIFT_BUILD_FLAGS[@]}"'
 
 all: universal
 
@@ -33,7 +36,7 @@ debug:
 	CONFIG=debug ./scripts/run.sh
 
 check:
-	swift build
+	bash -c 'source scripts/swift-flags.sh && swift build "$${SWIFT_BUILD_FLAGS[@]}"'
 
 clean:
 	rm -rf build .build
