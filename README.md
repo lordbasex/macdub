@@ -293,22 +293,27 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - [x] System status in Settings: chip, cores, memory, macOS, speech engine, Apple Intelligence.
 - [x] Summaries show elapsed seconds live and, when done, time, exact tokens (Apple Intelligence, Claude Code, Codex, Ollama, LM Studio) and cost (Claude Code); Apple Intelligence summaries fit the model's 4,096-token window.
 - [x] Settings › Permissions: reset MacDub's permissions and relaunch in one click; a single instance of the app at a time.
+- [x] 0.4.4: History shows transcription · audio · total times per sentence for dubbing too, and any sentence can be copied (right-click) in both tabs.
+- [x] 0.4.3: dubbing with SpeechAnalyzer's fast results — the translated voice starts after 0.7 s instead of 2.3 s (median), with more whole sentences (85 → 88 %).
+- [x] 0.4.2: History keeps times in tenths of a second, conversations always saved; README screenshots of every screen in English.
 - [x] 0.4.1: **Live translation** (beta): conversations through call apps, both ways, with the Google Meet extension (virtual microphone switch, chat), and History split into Dubbing and Live translation, conversations saved with their audio.
 - [x] 0.4.0: dubbing with your own Personal Voice; `SFSpeechRecognizer` segmentation rewritten: words lost 14.7 → 7.1 %, word error rate 36.3 → 22.9 %, whole sentences 55 → 61 %, worst latency 22.3 → 8.9 s ([plan](docs/plans/sfspeech-segmentation.md)).
 - [x] 0.3.1: MCP server hardened (DNS rebinding, path traversal, unsafe file deletion, malformed requests), SpeechAnalyzer waits bounded (worst latency 19.6 → 12.4 s), VoiceOver names on the main screens, verified on Intel.
 
 ### Next
 
-In priority order, from the 0.3.1 review:
+In priority order, after 0.4.4:
 
 - [ ] Run on macOS 15 — the only engine there is `SFSpeechRecognizer` and there is no Apple Intelligence; tested so far on Apple Silicon (M1, macOS 26.7) and Intel.
 - [ ] Publish the Meet extension in the Chrome Web Store (listing and privacy policy in [docs/chrome-extension](docs/chrome-extension/)), then accept only its id.
-- [ ] Authenticate the app's internal commands (XPC or a shared secret instead of open distributed notifications) and require a token on the MCP HTTP transport by default.
+- [ ] Authenticate the app's internal commands (XPC or a shared secret instead of open distributed notifications) and require a token on the MCP HTTP transport by default. Since 0.4.1 they include `startLive` (opens the microphone) and `demoDub` / `demoLive` / `snapshotUI` (read and write files): those should work only with the secret, or only in development builds.
+- [ ] `SFSpeechRecognizer` on real audio (a video in Chrome, not only the synthesized benchmark) and down to 5 % of words lost (6.8 % today; what is left is the recognizer, the pipeline drops under 1 %).
+- [ ] Live translation: an output choice for the voice you hear (like the microphone choice), speed-up for your voice into the call when it falls behind (the voice you hear already speeds up), and the conversation's translated voices in History playback (today one voice speaks both sides).
 - [ ] Automated tests for the app and the MCP server: `SessionStore`, MCP tools and HTTP transport, `Shell.run`.
 - [ ] VoiceOver in Settings, the menu bar panel, the floating subtitle bar and the History list, and a full session driven with VoiceOver.
 - [ ] Benchmarks from other Apple Silicon generations (M2–M6) and from real recordings in other languages, not only synthesized English.
 - [ ] Profile a full dubbing session (capture + recognition + translation + voice), Neural Engine energy included (`powermetrics`).
-- [ ] Notarized releases once the Developer ID is available (no more right-click › Open on first launch).
+- [ ] Notarized releases once the Developer ID is available (no more right-click › Open on first launch), built with the newest SDK (the release job could publish CI's SDK 27 build; locally the Command Line Tools fall back to SDK 26.5).
 
 ### Later
 
