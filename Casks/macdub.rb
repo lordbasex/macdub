@@ -3,8 +3,8 @@
 #   brew install --cask macdub
 # `scripts/release.sh` rewrites `version` and `sha256` on every release.
 cask "macdub" do
-  version "0.4.3"
-  sha256 "d37814a99450cae203109bac8fa2e9222313878676e06b6cc4812b1a8acfdea8"
+  version "0.4.4"
+  sha256 "8a0a59d70827e5706fc61606490d4fb9a055dc52916c1d7913f9c99bd3c86770"
 
   url "https://github.com/lordbasex/macdub/releases/download/v#{version}/MacDub-#{version}.zip"
   name "MacDub"
