@@ -373,7 +373,7 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         Log.speech.info("Segment: \(text, privacy: .public)")
         onSegmentRecognized?(segment)
 
-        Task { [translator, queue] in
+        Task { [weak self, translator, queue] in
             do {
                 let translated = try await translator.translate(text)
                 segment.translated = translated
@@ -381,7 +381,7 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
             } catch {
                 segment.failed = true
             }
-            queue.async { [weak self] in self?.onSegmentTranslated?(segment) }
+            queue.async { self?.onSegmentTranslated?(segment) }
         }
     }
 
