@@ -43,6 +43,7 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 | | Smart sentence segmentation | Cuts on punctuation, clause marks, length, pending time and silence; re-anchors when the recognizer rewrites earlier words. Unit-tested. |
 | **Translation** | On-device translation | Apple's `Translation` framework, 21 languages, models downloaded once. |
 | **Voice** | System voices with quality badges | 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ novelty; per-voice rate and volume; one-click reload after downloading voices. (Siri voices are not available to third-party apps.) |
+| | Personal Voice | Dub with **your own voice**: the Personal Voice recorded in *System Settings › Accessibility › Personal Voice* appears first in the list (👤) once MacDub is allowed to use it (*Settings › Voice › Personal Voice › Allow…*). Apple supports it from **macOS 14 Sonoma**, so every macOS MacDub runs on (15+); creating the voice needs a Mac with Apple silicon, and apps cannot create one — *Create in System Settings…* opens the pane. It speaks the language it was recorded in. |
 | | Latency management | Gentle speed-up when behind (configurable or off), stale sentences skipped past *Max delay*, backlog dropped with one click. Measured: translation ≈ 0.4 s, sentence end → voice ≈ 0.8 s with an empty queue, ≈ 2 s mean. |
 | | Karaoke highlighting | The word being spoken is highlighted in the panel, the floating bar and the menu bar panel. |
 | **Subtitles** | Transcript | While dubbing, the Dubbing screen becomes the live transcript: original + translation, per-sentence latency, level meter, skip/clear. The Subtitles screen holds the transcript options and exports; subtitles-only mode = voice off. |
@@ -114,7 +115,7 @@ Check which SDK a build uses with `xcrun --show-sdk-version`; force one with `SD
 2. **Speech Recognition** — requested when you first press Start.
 3. **Spoken language** — pick one marked as on-device. If it says *needs download*, add the language under *System Settings › Keyboard › Dictation* so macOS fetches the model.
 4. **Translate to** — the first time a language pair is used, *Settings › Speech › Prepare translation* downloads the model (needs internet that one time); MacDub also offers it when you press Start.
-5. **Voice** — choose a voice and press ▶ to hear it. For better voices: *Settings › Voice › Manage voices…* → *Accessibility › Spoken Content › System Voice › Manage Voices*, download **Enhanced/Premium** voices, then ↻.
+5. **Voice** — choose a voice and press ▶ to hear it. For better voices: *Settings › Voice › Manage voices…* → *Accessibility › Spoken Content › System Voice › Manage Voices*, download **Enhanced/Premium** voices, then ↻. To dub with your own voice, record a Personal Voice in the dubbing language and allow it in *Settings › Voice › Personal Voice*.
 6. Pick **what to capture** (an app or 🔊 Entire system), play something and press **Start** (⌘R).
 
 > With the tap engine the app must already be producing audio when you press Start; otherwise MacDub tells you and falls back to ScreenCaptureKit (no background mix).
@@ -303,6 +304,7 @@ In priority order, from the 0.3.1 review:
 ### Later
 
 - [ ] Speaker diarization (voice per speaker) when Apple exposes it or a lightweight on-device model fits.
+- [ ] MacDub's own on-device neural voice, offered to the whole Mac as a speech synthesis provider (`AVSpeechSynthesisProviderAudioUnit`, an AUv3 extension, macOS 13+) with a local model such as Piper or Kokoro. Start with a proof of concept: time to first audio on an M1 and quality in Spanish, and packaging the `.appex` without Xcode.
 - [ ] Keep summaries (with their time and tokens) in History next to each session.
 - [ ] Serve MCP HTTP requests concurrently (a long summary blocks other clients today).
 - [ ] More UI languages from the community.

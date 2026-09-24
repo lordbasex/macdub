@@ -33,7 +33,7 @@
 "System voice" = "System voice";
 "No voice installed for this language" = "No voice installed for this language";
 "Reload the voice list after downloading voices in System Settings" = "Reload the voice list after downloading voices in System Settings";
-"🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here." = "🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here.";
+"👤 Personal Voice · 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here." = "👤 Personal Voice · 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here.";
 "Rate" = "Rate";
 "Volume" = "Volume";
 "Skip backlog beyond %lld sentences" = "Skip backlog beyond %lld sentences";
@@ -363,3 +363,16 @@
 "Claude Desktop (paste)" = "Claude Desktop (paste)";
 "ChatGPT (paste)" = "ChatGPT (paste)";
 "%@ is not valid JSON — fix it (or add MacDub by hand with Copy › JSON) so its other servers aren't lost." = "%@ is not valid JSON — fix it (or add MacDub by hand with Copy › JSON) so its other servers aren't lost.";
+
+/* Personal Voice */
+"Personal Voice" = "Personal Voice";
+"👤 Your Personal Voice is in the list above." = "👤 Your Personal Voice is in the list above.";
+"MacDub may use your Personal Voice, but none was recorded in the dubbing language. Personal Voice speaks the language it was recorded in." = "MacDub may use your Personal Voice, but none was recorded in the dubbing language. Personal Voice speaks the language it was recorded in.";
+"Not allowed" = "Not allowed";
+"Open System Settings" = "Open System Settings";
+"Turn MacDub on under Accessibility › Personal Voice › Allow apps to use your Personal Voice." = "Turn MacDub on under Accessibility › Personal Voice › Allow apps to use your Personal Voice.";
+"Dub with the voice you recorded in Accessibility › Personal Voice" = "Dub with the voice you recorded in Accessibility › Personal Voice";
+"Allow…" = "Allow…";
+"Personal Voice isn't available on this Mac. It needs macOS 14 or later, and creating one needs a Mac with Apple silicon." = "Personal Voice isn't available on this Mac. It needs macOS 14 or later, and creating one needs a Mac with Apple silicon.";
+"Record your voice (about 15 minutes of reading aloud); only System Settings can create it" = "Record your voice (about 15 minutes of reading aloud); only System Settings can create it";
+"Create in System Settings…" = "Create in System Settings…";

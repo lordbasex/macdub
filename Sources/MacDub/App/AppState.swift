@@ -503,6 +503,39 @@ final class AppState: ObservableObject {
         refreshVoices()
     }
 
+    @Published private(set) var personalVoiceStatus = VoiceSynthesisManager.personalVoiceStatus
+
+    /// Let MacDub use the person's Personal Voice: the system asks once; after a refusal only
+    /// System Settings › Accessibility › Personal Voice can change it.
+    func requestPersonalVoice() {
+        Task { @MainActor in
+            if personalVoiceStatus == .notDetermined {
+                personalVoiceStatus = await VoiceSynthesisManager.requestPersonalVoice()
+            } else {
+                SystemSettings.open(SystemSettings.personalVoice)
+            }
+            reloadVoices()
+        }
+    }
+
+    /// Apps cannot create a Personal Voice; open the pane where it is recorded and look again
+    /// for it when MacDub comes back to the front.
+    func openPersonalVoiceSettings() {
+        SystemSettings.open(SystemSettings.personalVoice)
+        reloadOnActivate = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if let token = self.reloadOnActivate { NotificationCenter.default.removeObserver(token) }
+                self.reloadOnActivate = nil
+                self.reloadVoices()
+            }
+        }
+    }
+
+    private var reloadOnActivate: NSObjectProtocol?
+
     /// Re-query the system voice list (after the user downloads voices in System Settings).
     func reloadVoices() {
         refreshVoices()
@@ -510,6 +543,7 @@ final class AppState: ObservableObject {
     }
 
     private func refreshVoices() {
+        personalVoiceStatus = VoiceSynthesisManager.personalVoiceStatus
         voices = VoiceSynthesisManager.voices(forLanguageCode: settings.targetLanguageCode)
         capabilities.voiceAvailable = !voices.isEmpty
         if !voices.contains(where: { $0.identifier == settings.voiceIdentifier }) {

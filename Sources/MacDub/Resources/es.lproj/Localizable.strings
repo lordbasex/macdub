@@ -41,7 +41,7 @@
 "System voice" = "Voz del sistema";
 "No voice installed for this language" = "No hay voces instaladas para este idioma";
 "Reload the voice list after downloading voices in System Settings" = "Recargar la lista tras descargar voces en Ajustes del Sistema";
-"🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here." = "🟢 Premium · 🟡 Mejorada · ⚪ Compacta · ⚫ Novedad. Descarga voces Mejoradas/Premium en Ajustes del Sistema; las voces de Siri las reserva Apple y nunca aparecen aquí.";
+"👤 Personal Voice · 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here." = "👤 Voz personal · 🟢 Premium · 🟡 Mejorada · ⚪ Compacta · ⚫ Novedad. Descarga voces Mejoradas/Premium en Ajustes del Sistema; las voces de Siri las reserva Apple y nunca aparecen aquí.";
 "Rate" = "Velocidad";
 "Volume" = "Volumen";
 "Skip backlog beyond %lld sentences" = "Saltar la cola a partir de %lld frases";
@@ -394,3 +394,16 @@
 "Claude Desktop (paste)" = "Claude Desktop (pegar)";
 "ChatGPT (paste)" = "ChatGPT (pegar)";
 "%@ is not valid JSON — fix it (or add MacDub by hand with Copy › JSON) so its other servers aren't lost." = "%@ no es un JSON válido: corrígelo (o añade MacDub a mano con Copiar › JSON) para no perder sus otros servidores.";
+
+/* Personal Voice */
+"Personal Voice" = "Voz personal";
+"👤 Your Personal Voice is in the list above." = "👤 Tu Voz personal está en la lista de arriba.";
+"MacDub may use your Personal Voice, but none was recorded in the dubbing language. Personal Voice speaks the language it was recorded in." = "MacDub puede usar tu Voz personal, pero no hay ninguna grabada en el idioma del doblaje. La Voz personal habla el idioma en que se grabó.";
+"Not allowed" = "No permitido";
+"Open System Settings" = "Abrir Ajustes del Sistema";
+"Turn MacDub on under Accessibility › Personal Voice › Allow apps to use your Personal Voice." = "Activa MacDub en Accesibilidad › Voz personal › Permitir a apps usar tu voz personal.";
+"Dub with the voice you recorded in Accessibility › Personal Voice" = "Doblar con la voz que grabaste en Accesibilidad › Voz personal";
+"Allow…" = "Permitir…";
+"Personal Voice isn't available on this Mac. It needs macOS 14 or later, and creating one needs a Mac with Apple silicon." = "Voz personal no está disponible en esta Mac. Requiere macOS 14 o posterior, y para crearla hace falta una Mac con Apple silicon.";
+"Record your voice (about 15 minutes of reading aloud); only System Settings can create it" = "Graba tu voz (unos 15 minutos leyendo en voz alta); solo Ajustes del Sistema puede crearla";
+"Create in System Settings…" = "Crear en Ajustes…";

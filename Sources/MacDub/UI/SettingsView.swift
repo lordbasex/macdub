@@ -278,11 +278,42 @@ private struct VoiceSettingsTab: View {
                     Button { state.reloadVoices() } label: { Image(systemName: "arrow.clockwise") }
                         .iconButtonHelp("Reload the voice list after downloading voices in System Settings")
                 }
-                Text("🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here.")
+                Text("👤 Personal Voice · 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ Novelty. Download Enhanced/Premium voices in System Settings; Siri voices are reserved by Apple and never appear here.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("Test voice") { state.testVoice() }
                     Button("Manage voices…") { SystemSettings.open(SystemSettings.spokenContent) }
+                }
+            }
+            Section("Personal Voice") {
+                let hasPersonal = state.voices.contains(where: VoiceSynthesisManager.isPersonal)
+                switch state.personalVoiceStatus {
+                case .unsupported:
+                    LabeledContent("Dub with the voice you recorded in Accessibility › Personal Voice") {
+                        Button("Allow…") {}.disabled(true)
+                    }
+                    Text("Personal Voice isn't available on this Mac. It needs macOS 14 or later, and creating one needs a Mac with Apple silicon.")
+                        .font(.caption).foregroundStyle(.secondary)
+                case .authorized:
+                    Text(hasPersonal
+                         ? "👤 Your Personal Voice is in the list above."
+                         : "MacDub may use your Personal Voice, but none was recorded in the dubbing language. Personal Voice speaks the language it was recorded in.")
+                        .font(.caption).foregroundStyle(.secondary)
+                case .denied:
+                    LabeledContent("Not allowed") {
+                        Button("Open System Settings") { state.requestPersonalVoice() }
+                    }
+                    Text("Turn MacDub on under Accessibility › Personal Voice › Allow apps to use your Personal Voice.")
+                        .font(.caption).foregroundStyle(.secondary)
+                default:
+                    LabeledContent("Dub with the voice you recorded in Accessibility › Personal Voice") {
+                        Button("Allow…") { state.requestPersonalVoice() }
+                    }
+                }
+                if state.personalVoiceStatus != .unsupported, !hasPersonal {
+                    LabeledContent("Record your voice (about 15 minutes of reading aloud); only System Settings can create it") {
+                        Button("Create in System Settings…") { state.openPersonalVoiceSettings() }
+                    }
                 }
             }
             Section("Playback") {

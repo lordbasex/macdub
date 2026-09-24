@@ -45,17 +45,36 @@ final class VoiceSynthesisManager: NSObject {
 
     static func voices(forLanguageCode code: String) -> [AVSpeechSynthesisVoice] {
         let prefix = code.lowercased()
-        // Best first: premium > enhanced > compact; within a tier, Apple's regular voices (Mónica,
-        // Paulina…) before the Eloquence novelty voices (Eddy, Flo, Grandma…).
+        // Best first: the person's own Personal Voice, then premium > enhanced > compact; within a
+        // tier, Apple's regular voices (Mónica, Paulina…) before the Eloquence novelty voices
+        // (Eddy, Flo, Grandma…).
         func isNovelty(_ v: AVSpeechSynthesisVoice) -> Bool { v.identifier.contains(".eloquence.") }
         return AVSpeechSynthesisVoice.speechVoices()
             .filter { $0.language.lowercased().hasPrefix(prefix) }
             .sorted {
+                if isPersonal($0) != isPersonal($1) { return isPersonal($0) }
                 if $0.quality != $1.quality { return $0.quality.rawValue > $1.quality.rawValue }
                 if isNovelty($0) != isNovelty($1) { return !isNovelty($0) }
                 if $0.language != $1.language { return $0.language < $1.language }
                 return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
+    }
+
+    /// A Personal Voice the person recorded (Accessibility › Personal Voice). macOS lists it
+    /// only once the app was allowed to use it (`requestPersonalVoiceAuthorization`).
+    static func isPersonal(_ v: AVSpeechSynthesisVoice) -> Bool {
+        v.voiceTraits.contains(.isPersonalVoice)
+    }
+
+    static var personalVoiceStatus: AVSpeechSynthesizer.PersonalVoiceAuthorizationStatus {
+        AVSpeechSynthesizer.personalVoiceAuthorizationStatus
+    }
+
+    /// Asks macOS to let MacDub use the person's Personal Voice (a system prompt the first time).
+    static func requestPersonalVoice() async -> AVSpeechSynthesizer.PersonalVoiceAuthorizationStatus {
+        await withCheckedContinuation { cont in
+            AVSpeechSynthesizer.requestPersonalVoiceAuthorization { cont.resume(returning: $0) }
+        }
     }
 
     static func qualityLabel(_ q: AVSpeechSynthesisVoiceQuality) -> String {
@@ -67,8 +86,9 @@ final class VoiceSynthesisManager: NSObject {
     }
 
     /// Coloured dot for menus (emoji survive NSMenu titles; SwiftUI colours don't):
-    /// 🟢 premium · 🟡 enhanced · ⚪ compact · ⚫ novelty (Eloquence).
+    /// 👤 Personal Voice · 🟢 premium · 🟡 enhanced · ⚪ compact · ⚫ novelty (Eloquence).
     static func qualityDot(_ v: AVSpeechSynthesisVoice) -> String {
+        if isPersonal(v) { return "👤" }
         if v.identifier.contains(".eloquence.") { return "⚫" }
         switch v.quality {
         case .premium: return "🟢"
