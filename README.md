@@ -286,7 +286,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - [x] System status in Settings: chip, cores, memory, macOS, speech engine, Apple Intelligence.
 - [x] Summaries show elapsed seconds live and, when done, time, exact tokens (Apple Intelligence, Claude Code, Codex, Ollama, LM Studio) and cost (Claude Code); Apple Intelligence summaries fit the model's 4,096-token window.
 - [x] Settings › Permissions: reset MacDub's permissions and relaunch in one click; a single instance of the app at a time.
-- [x] `SFSpeechRecognizer` segmentation rewritten: words lost 14.7 → 7.1 %, word error rate 36.3 → 22.9 %, whole sentences 55 → 61 %, worst latency 22.3 → 8.9 s ([plan](docs/plans/sfspeech-segmentation.md)).
+- [x] 0.4.0: dubbing with your own Personal Voice; `SFSpeechRecognizer` segmentation rewritten: words lost 14.7 → 7.1 %, word error rate 36.3 → 22.9 %, whole sentences 55 → 61 %, worst latency 22.3 → 8.9 s ([plan](docs/plans/sfspeech-segmentation.md)).
 - [x] 0.3.1: MCP server hardened (DNS rebinding, path traversal, unsafe file deletion, malformed requests), SpeechAnalyzer waits bounded (worst latency 19.6 → 12.4 s), VoiceOver names on the main screens, verified on Intel.
 
 ### Next
