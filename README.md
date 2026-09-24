@@ -42,6 +42,9 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 | | `SpeechAnalyzer` on macOS 26 | Chosen automatically when the OS offers it; live fallback to `SFSpeechRecognizer` if it fails; compiled out on older toolchains. MacDub translates and speaks its *finalized* results — whole, corrected, punctuated sentences (85–92 % of sentences in one piece in the [benchmark](docs/benchmarks/), against 35 % segmenting its volatile results) — and shows the volatile text live. The engine can be picked in *Settings › Capture › Engine*, which also says which one was detected and which one is running. |
 | | Smart sentence segmentation | Cuts on punctuation, clause marks, length, pending time and silence; re-anchors when the recognizer rewrites earlier words. Unit-tested. |
 | **Translation** | On-device translation | Apple's `Translation` framework, 21 languages, models downloaded once. |
+| **Live translation** *(beta, macOS 26+)* | Talk through Meet, Zoom or any call app | What you say reaches the call translated, in the voice you choose (your Personal Voice included), through a virtual microphone ([BlackHole](https://existential.audio/blackhole/), installed from MacDub with one click); what they say reaches your headphones in your language. Two SpeechAnalyzers at once with fast results: about 1.8 s from the end of a sentence to its translated voice. |
+| | Google Meet extension | Switches Meet's microphone to the translated voice by itself (and back when you stop), posts your translation in the chat and translates the chat messages — *Settings › Extensions*. |
+| | Conversation view | Chat-style, with a "…" bubble while someone speaks and, for each sentence, transcription · audio · total times; choose the microphone, the languages (those on your Mac first) and a voice for each side. |
 | **Voice** | System voices with quality badges | 🟢 Premium · 🟡 Enhanced · ⚪ Compact · ⚫ novelty; per-voice rate and volume; one-click reload after downloading voices. (Siri voices are not available to third-party apps.) |
 | | Personal Voice | Dub with **your own voice**: the Personal Voice recorded in *System Settings › Accessibility › Personal Voice* appears first in the list (👤) once MacDub is allowed to use it (*Settings › Voice › Personal Voice › Allow…*). Apple supports it from **macOS 14 Sonoma**, so every macOS MacDub runs on (15+); creating the voice needs a Mac with Apple silicon, and apps cannot create one — *Create in System Settings…* opens the pane. It speaks the language it was recorded in. |
 | | Latency management | Gentle speed-up when behind (configurable or off), stale sentences skipped past *Max delay*, backlog dropped with one click. Measured: translation ≈ 0.4 s, sentence end → voice ≈ 0.8 s with an empty queue, ≈ 2 s mean. |
@@ -272,6 +275,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - Safari plays audio through shared WebKit XPC processes; tapping Safari can affect other WebKit apps.
 - No speaker diarization: everyone gets the same voice (the data model has a `speaker` field ready for it).
 - Siri voices cannot be used by third-party apps.
+- Live translation needs macOS 26 (two SpeechAnalyzers at once; two SFSpeechRecognizers cannot run in one app), the BlackHole virtual audio driver for the call to hear you, and headphones (with speakers, your microphone would send their translated voice back). Its chat features work with Google Meet in Chrome only, and the Meet extension installs in developer mode until it is in the Chrome Web Store.
 - History playback highlights the original text by spreading each sentence over its words (the recognizer keeps no per-word timing); the translated text follows the voice exactly.
 
 ## Roadmap
@@ -286,6 +290,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - [x] System status in Settings: chip, cores, memory, macOS, speech engine, Apple Intelligence.
 - [x] Summaries show elapsed seconds live and, when done, time, exact tokens (Apple Intelligence, Claude Code, Codex, Ollama, LM Studio) and cost (Claude Code); Apple Intelligence summaries fit the model's 4,096-token window.
 - [x] Settings › Permissions: reset MacDub's permissions and relaunch in one click; a single instance of the app at a time.
+- [x] 0.4.1: **Live translation** (beta): conversations through call apps, both ways, with the Google Meet extension (virtual microphone switch, chat), and History split into Dubbing and Live translation, conversations saved with their audio.
 - [x] 0.4.0: dubbing with your own Personal Voice; `SFSpeechRecognizer` segmentation rewritten: words lost 14.7 → 7.1 %, word error rate 36.3 → 22.9 %, whole sentences 55 → 61 %, worst latency 22.3 → 8.9 s ([plan](docs/plans/sfspeech-segmentation.md)).
 - [x] 0.3.1: MCP server hardened (DNS rebinding, path traversal, unsafe file deletion, malformed requests), SpeechAnalyzer waits bounded (worst latency 19.6 → 12.4 s), VoiceOver names on the main screens, verified on Intel.
 
@@ -294,6 +299,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 In priority order, from the 0.3.1 review:
 
 - [ ] Run on macOS 15 — the only engine there is `SFSpeechRecognizer` and there is no Apple Intelligence; tested so far on Apple Silicon (M1, macOS 26.7) and Intel.
+- [ ] Publish the Meet extension in the Chrome Web Store (listing and privacy policy in [docs/chrome-extension](docs/chrome-extension/)), then accept only its id.
 - [ ] Authenticate the app's internal commands (XPC or a shared secret instead of open distributed notifications) and require a token on the MCP HTTP transport by default.
 - [ ] Automated tests for the app and the MCP server: `SessionStore`, MCP tools and HTTP transport, `Shell.run`.
 - [ ] VoiceOver in Settings, the menu bar panel, the floating subtitle bar and the History list, and a full session driven with VoiceOver.
@@ -304,8 +310,10 @@ In priority order, from the 0.3.1 review:
 ### Later
 
 - [ ] Speaker diarization (voice per speaker) when Apple exposes it or a lightweight on-device model fits.
+- [ ] MacDub's own virtual microphone ("MacDub Mic"): a Core Audio driver (Audio Server Plug-in) in its own repository, so live translation no longer needs BlackHole installed from Homebrew and the call app shows MacDub's name.
+- [ ] Live translation chat beyond Meet in Chrome: Zoom, Teams and Slack through the macOS Accessibility APIs.
 - [ ] A third recognition engine running Whisper or Parakeet on Apple silicon with [MLX](https://github.com/ml-explore/mlx): better accuracy and punctuation than `SFSpeechRecognizer`, the only engine on macOS 15. Fed in windows (not streaming), so it needs the latency measured. Proof of concept first: check that `mlx-swift` builds without Xcode (its Metal shaders), or else run MLX in a helper process, then compare it with the other two engines on the benchmark.
-- [ ] MacDub's own on-device neural voice, offered to the whole Mac as a speech synthesis provider (`AVSpeechSynthesisProviderAudioUnit`, an AUv3 extension, macOS 13+) with a local model such as Piper or Kokoro, run with MLX. Start with a proof of concept: time to first audio on an M1 and quality in Spanish, and packaging the `.appex` without Xcode.
+- [ ] MacDub's own on-device neural voice, offered to the whole Mac as a speech synthesis provider (`AVSpeechSynthesisProviderAudioUnit`, an AUv3 extension, macOS 13+) with a local model such as Piper or Kokoro, run with MLX ([mlx-audio](https://github.com/Blaizzy/mlx-audio) has TTS models ready for Apple silicon). Start with a proof of concept: time to first audio on an M1 and quality in Spanish, and packaging the `.appex` without Xcode.
 - [ ] Keep summaries (with their time and tokens) in History next to each session.
 - [ ] Serve MCP HTTP requests concurrently (a long summary blocks other clients today).
 - [ ] More UI languages from the community.

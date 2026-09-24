@@ -214,3 +214,39 @@ final class SessionAudioRecorder {
         framesWritten = file.length
     }
 }
+
+extension SessionAudioRecorder {
+    /// Sums mono takes that share the same time origin (live translation: your microphone and
+    /// the call) into one take at `output`, so History plays and exports it like any session.
+    static func mix(_ inputs: [URL], into output: URL) throws {
+        let files = try inputs.map { try AVAudioFile(forReading: $0) }
+        guard let first = files.first else { return }
+        let rate = first.processingFormat.sampleRate
+        let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
+        try? FileManager.default.removeItem(at: output)
+        let out = try AVAudioFile(forWriting: output,
+                                  settings: [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: rate,
+                                             AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: bitRateForMix],
+                                  commonFormat: .pcmFormatFloat32, interleaved: false)
+        let chunk: AVAudioFrameCount = 8192
+        let length = files.map(\.length).max() ?? 0
+        var position: AVAudioFramePosition = 0
+        let sum = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunk)!
+        let part = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunk)!
+        while position < length {
+            let frames = AVAudioFrameCount(min(AVAudioFramePosition(chunk), length - position))
+            sum.frameLength = frames
+            memset(sum.floatChannelData![0], 0, Int(frames) * MemoryLayout<Float>.size)
+            for file in files where file.processingFormat.sampleRate == rate && position < file.length {
+                file.framePosition = position
+                try file.read(into: part, frameCount: min(frames, AVAudioFrameCount(file.length - position)))
+                let a = sum.floatChannelData![0], b = part.floatChannelData![0]
+                for i in 0..<Int(part.frameLength) { a[i] = max(-1, min(1, a[i] + b[i])) }
+            }
+            try out.write(from: sum)
+            position += AVAudioFramePosition(frames)
+        }
+    }
+
+    private static var bitRateForMix: Int { 48_000 }
+}

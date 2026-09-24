@@ -122,3 +122,42 @@ import MacDubCore
         #expect(r.audioURL == nil)
     }
 }
+
+@Suite struct LiveConversationRecordTests {
+    @Test func sessionsSavedBeforeLiveTranslationAreDubbing() throws {
+        let json = """
+        {"id":"A","startedAt":"2026-09-22T10:00:00Z","endedAt":"2026-09-22T10:01:00Z","sourceLocale":"en-US",
+         "targetLanguage":"es","segments":[{"original":"Hello","translated":"Hola","recognizedAt":"2026-09-22T10:00:05Z"}]}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let record = try decoder.decode(SessionRecord.self, from: Data(json.utf8))
+        #expect(!record.isLive)
+        #expect(record.segments[0].side == nil)
+    }
+
+    @Test func conversationKeepsWhoSpokeAndLabelsExports() throws {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        var mine = Segment(original: "Hola", translated: "Hello", recognizedAt: start.addingTimeInterval(2))
+        mine.side = "me"
+        mine.speechEndedAt = start.addingTimeInterval(1)
+        var theirs = Segment(original: "Nice to meet you", translated: "Encantado", recognizedAt: start.addingTimeInterval(5))
+        theirs.side = "them"
+        theirs.via = "chat"
+        theirs.author = "Ana"
+        let record = SessionRecord(id: "B", startedAt: start, appName: "Chrome", appBundleIdentifier: nil,
+                                   sourceLocale: "es-MX", targetLanguage: "en-US", segments: [mine, theirs],
+                                   kind: SessionRecord.liveKind)
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        let back = try decoder.decode(SessionRecord.self, from: encoder.encode(record))
+        #expect(back.isLive)
+        #expect(back.segments.map(\.side) == ["me", "them"])
+        #expect(back.segments[1].author == "Ana")
+        #expect(back.segments[0].speechEndedAt == mine.speechEndedAt)
+
+        let txt = back.render(.txt, content: .both, sideLabels: ["me": "You", "them": "Them"])
+        #expect(txt.contains("You: Hola"))
+        #expect(txt.contains("Them (Ana): Nice to meet you"))
+    }
+}

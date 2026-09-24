@@ -41,36 +41,76 @@ final class LiveMonitorServer: ObservableObject {
         url = nil
     }
 
+    /// A request the page or the Meet extension made.
+    struct Request {
+        let method: String
+        let path: String
+        let origin: String?
+        /// `Sec-Fetch-Mode`: "cors" for an extension's fetch, "no-cors" for a page's blind request.
+        let fetchMode: String?
+        let body: Data
+    }
+
+    /// Answers requests other than the page and `/state` (the chat bridge); nil → 404.
+    var handler: (Request) -> (type: String, body: Data)? = { _ in nil }
+
     private func serve(_ connection: NWConnection) {
         connection.start(queue: queue)
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { [weak self] data, _, _, _ in
-            let request = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            let path = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
-            // DNS rebinding: a web page could point its own name at 127.0.0.1 and read the
-            // transcript. Only a Host naming this machine is served.
-            let host = request.split(separator: "\r\n").first { $0.lowercased().hasPrefix("host:") }?
-                .dropFirst(5).trimmingCharacters(in: .whitespaces).lowercased() ?? ""
-            let hostName = host.split(separator: ":").first.map(String.init) ?? ""
-            Task { @MainActor in
-                guard let self else { connection.cancel(); return }
-                guard hostName == "127.0.0.1" || hostName == "localhost" else {
-                    let head = "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                    connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in connection.cancel() })
-                    return
-                }
-                let (type, body): (String, Data)
-                if path.hasPrefix("/state") {
-                    type = "application/json"
-                    body = (try? JSONSerialization.data(withJSONObject: self.state())) ?? Data("{}".utf8)
-                } else {
-                    type = "text/html; charset=utf-8"
-                    body = Data(Self.page.utf8)
-                }
-                var head = "HTTP/1.1 200 OK\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\n"
-                head += "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
-                connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
+        receive(connection, buffer: Data())
+    }
+
+    /// Reads until the headers and `Content-Length` bytes of body have arrived.
+    private nonisolated func receive(_ connection: NWConnection, buffer: Data) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
+            var buffer = buffer
+            if let data { buffer.append(data) }
+            let separator = Data("\r\n\r\n".utf8)
+            guard let end = buffer.range(of: separator) else {
+                if complete || error != nil || buffer.count > 1_000_000 { connection.cancel() } else { self?.receive(connection, buffer: buffer) }
+                return
             }
+            let head = String(decoding: buffer[..<end.lowerBound], as: UTF8.self)
+            let length = head.split(separator: "\r\n")
+                .first { $0.lowercased().hasPrefix("content-length:") }
+                .flatMap { Int($0.dropFirst(15).trimmingCharacters(in: .whitespaces)) } ?? 0
+            let body = buffer[end.upperBound...]
+            guard body.count >= min(length, 1_000_000) || complete || error != nil else {
+                self?.receive(connection, buffer: buffer)
+                return
+            }
+            Task { @MainActor in self?.respond(connection, head: head, body: Data(body.prefix(length))) }
         }
+    }
+
+    private func respond(_ connection: NWConnection, head: String, body: Data) {
+        let lines = head.split(separator: "\r\n")
+        let parts = lines.first?.split(separator: " ") ?? []
+        let method = parts.first.map(String.init) ?? "GET"
+        let path = parts.dropFirst().first.map(String.init) ?? "/"
+        func header(_ name: String) -> String? {
+            lines.first { $0.lowercased().hasPrefix(name + ":") }
+                .map { $0.dropFirst(name.count + 1).trimmingCharacters(in: .whitespaces) }
+        }
+        // DNS rebinding: a web page could point its own name at 127.0.0.1 and read the
+        // transcript. Only a Host naming this machine is served.
+        let hostName = (header("host") ?? "").lowercased().split(separator: ":").first.map(String.init) ?? ""
+        guard hostName == "127.0.0.1" || hostName == "localhost" else { return send(connection, status: "403 Forbidden") }
+
+        if path.hasPrefix("/state") {
+            send(connection, type: "application/json", body: (try? JSONSerialization.data(withJSONObject: state())) ?? Data("{}".utf8))
+        } else if path == "/" || path.hasPrefix("/?") {
+            send(connection, type: "text/html; charset=utf-8", body: Data(Self.page.utf8))
+        } else if let answer = handler(Request(method: method, path: path, origin: header("origin"), fetchMode: header("sec-fetch-mode"), body: body)) {
+            send(connection, type: answer.type, body: answer.body)
+        } else {
+            send(connection, status: "404 Not Found")
+        }
+    }
+
+    private func send(_ connection: NWConnection, status: String = "200 OK", type: String = "text/plain", body: Data = Data()) {
+        var head = "HTTP/1.1 \(status)\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\n"
+        head += "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+        connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
     }
 
     static let page = #"""

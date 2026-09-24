@@ -98,7 +98,20 @@ enum LivePilot {
                 try await Task.sleep(for: .milliseconds(300))
             }
             let started = Date()
-            try await play(buffers.list, on: device)
+            if let count = value("--via-speaker", in: args).flatMap(Int.init) {
+                // The live translation speaker, several sentences in a row (it once played only
+                // the first).
+                let speaker = try LiveDeviceSpeaker(device: device)
+                let starts = StartLog()
+                for i in 0..<count {
+                    await speaker.enqueue(buffers.list) { starts.add(i) }
+                    try await Task.sleep(for: .seconds(Double(frameCount(buffers.list)) / 48_000 + 1))
+                }
+                report["sentencesStarted"] = starts.count
+                await speaker.stop()
+            } else {
+                try await play(buffers.list, on: device)
+            }
             report["playedOn"] = deviceName
             if let recorder {
                 try await Task.sleep(for: .milliseconds(500))
@@ -175,6 +188,15 @@ enum LivePilot {
             }
         }
         engine.stop()
+    }
+
+    private static func frameCount(_ list: [AVAudioPCMBuffer]) -> Int { list.reduce(0) { $0 + Int($1.frameLength) } }
+
+    private final class StartLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var seen = Set<Int>()
+        func add(_ i: Int) { lock.lock(); seen.insert(i); lock.unlock() }
+        var count: Int { lock.lock(); defer { lock.unlock() }; return seen.count }
     }
 
     /// Records a device's input into a file and measures what arrived.

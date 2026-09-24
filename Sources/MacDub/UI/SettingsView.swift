@@ -17,6 +17,7 @@ struct SettingsView: View {
             VoiceSettingsTab().tabItem { Label("Voice", systemImage: "speaker.wave.2") }
             SubtitlesSettingsTab().tabItem { Label("Subtitles", systemImage: "captions.bubble") }
             AISettingsTab().tabItem { Label("AI & MCP", systemImage: "sparkles") }
+            ExtensionsSettingsTab().tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
             PermissionsSettingsTab().tabItem { Label("Permissions", systemImage: "lock.shield") }
         }
         .frame(width: Self.width)
@@ -456,7 +457,69 @@ extension SettingsView {
     static var snapshotTabs: [(name: String, view: AnyView)] {
         [("general", AnyView(GeneralSettingsTab())), ("capture", AnyView(CaptureSettingsTab())),
          ("speech", AnyView(SpeechSettingsTab())), ("voice", AnyView(VoiceSettingsTab())),
-         ("subtitles", AnyView(SubtitlesSettingsTab())), ("ai", AnyView(AISettingsTab())),
+         ("subtitles", AnyView(SubtitlesSettingsTab())), ("ai", AnyView(AISettingsTab())), ("extensions", AnyView(ExtensionsSettingsTab())),
          ("permissions", AnyView(PermissionsSettingsTab()))]
+    }
+}
+
+/// The Chrome extension for live translation in Meet: what it does, whether it is talking to
+/// MacDub, and one click to install it.
+private struct ExtensionsSettingsTab: View {
+    @EnvironmentObject private var state: AppState
+    @State private var error: String?
+
+    var body: some View {
+        Form {
+            Section {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 40, height: 40)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("MacDub · Live translation for Meet").font(.headline)
+                        Text("For live translation in Google Meet on Chrome: switches the call's microphone to the translated voice by itself, posts the translation in the chat and brings the chat messages to MacDub. It only talks to MacDub on this Mac.")
+                            .font(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                LabeledContent("Status") {
+                    if let seen = state.extensionLastSeen, Date().timeIntervalSince(seen) < 30 {
+                        Label("Connected", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else if let seen = state.extensionLastSeen {
+                        Text(LF("Last seen %@", seen.formatted(date: .omitted, time: .shortened))).foregroundStyle(.secondary)
+                    } else {
+                        Text("Not seen yet (it connects while live translation runs)").foregroundStyle(.secondary)
+                    }
+                }
+                if let version = ChromeExtension.version {
+                    LabeledContent("Version") { Text(version).monospacedDigit() }
+                }
+                HStack {
+                    Button(ChromeExtension.webStoreID == nil ? "Install in Chrome…" : "Get it from the Chrome Web Store") {
+                        do { try ChromeExtension.install(); error = nil } catch { self.error = error.localizedDescription }
+                    }
+                    .disabled(ChromeExtension.chromeURL == nil && ChromeExtension.webStoreID == nil)
+                    if ChromeExtension.chromeURL == nil { Text("Google Chrome is not installed.").font(.caption).foregroundStyle(.orange) }
+                }
+                if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            }
+            if ChromeExtension.webStoreID == nil {
+                Section("Install (developer mode, until it is in the Chrome Web Store)") {
+                    Text("1. “Install in Chrome…” opens the extension's folder and Chrome's Extensions page.")
+                    Text("2. Turn on Developer mode (top right).")
+                    Text("3. Load unpacked › choose the chrome-extension folder (⌘⇧G and paste the path below).")
+                    Text("4. Reload the Meet tab. After a MacDub update, press ↻ on the extension's card.")
+                    HStack {
+                        Text(ChromeExtension.folder.path).font(.caption.monospaced()).textSelection(.enabled)
+                        Spacer()
+                        Button("Copy path") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(ChromeExtension.folder.path, forType: .string)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                .font(.callout)
+            }
+        }
+        .formStyle(.grouped)
     }
 }

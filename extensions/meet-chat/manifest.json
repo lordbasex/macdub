@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "MacDub \u00b7 Live translation for Meet",
+  "short_name": "MacDub Meet",
+  "version": "0.4.1",
+  "description": "Live translation for Google Meet with MacDub: while MacDub translates, the call hears the translated voice (virtual microphone, switched automatically), the translation can be posted in the chat, and chat messages go to MacDub to translate. Talks only to MacDub on this Mac (127.0.0.1).",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "MacDub \u00b7 Live translation for Meet",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "js": [
+        "page.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

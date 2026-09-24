@@ -440,6 +440,10 @@ final class AppState: ObservableObject {
                         self.settings.originalVolume = min(1, max(0, level))
                     }
                     if let d = note.userInfo?["duckOnlyWhileSpeaking"] as? String { self.settings.duckOnlyWhileSpeaking = (d == "true") }
+                case .startLive:
+                    if self.live.phase == .idle { self.section = .live; self.toggleLiveTranslation() }
+                case .stopLive:
+                    if self.live.phase == .running { self.toggleLiveTranslation() }
                 case .snapshotUI:
                     guard let path = note.userInfo?["path"] as? String else { return }
                     await UISnapshots.capture(to: URL(fileURLWithPath: path), label: note.userInfo?["label"] as? String ?? "ui", state: self)
@@ -756,18 +760,84 @@ final class AppState: ObservableObject {
     func toggleLiveTranslation() {
         Task {
             if live.phase == .running { await live.stop() }
-            else if live.phase == .idle, phase == .idle, let target = selectedTarget { await live.start(target: target) }
+            else if live.phase == .idle, phase == .idle, let target = selectedTarget {
+                // The Meet extension talks to MacDub through the local server (virtual
+                // microphone switch, chat).
+                startLiveServer()
+                live.saveSessions = settings.saveSessions
+                live.recordAudio = settings.recordAudio
+                live.onArchive = { [weak self] record in
+                    do {
+                        try SessionStore.save(record)
+                        self?.refreshSessions()
+                        self?.refreshStorageSize()
+                    } catch {
+                        Log.app.error("Could not save the conversation: \(error.localizedDescription, privacy: .public)")
+                    }
+                }
+                await live.start(target: target)
+            }
         }
     }
 
     /// Serves the live translation page on 127.0.0.1 and opens it in the browser.
     func openLiveMonitor() {
+        guard startLiveServer() else { return }
+        if let url = liveMonitor.url { NSWorkspace.shared.open(url) }
+    }
+
+    /// The local server behind the monitor page and the Meet chat extension.
+    @discardableResult
+    private func startLiveServer() -> Bool {
         liveMonitor.state = { [weak self] in self?.liveState() ?? [:] }
+        liveMonitor.handler = { [weak self] request in self?.chatBridge(request) }
         do {
             try liveMonitor.start()
-            if let url = liveMonitor.url { NSWorkspace.shared.open(url) }
+            return true
         } catch {
             present(message: L("Could not start the monitor page."), suggestion: error.localizedDescription)
+            return false
+        }
+    }
+
+    /// The Meet extension's calls: `/chat/hello`, `/chat/outbox` (messages to post) and
+    /// `/chat/inbox` (a message someone wrote). Only an extension's origin is answered, so a web
+    /// page cannot write to or read the chat through MacDub.
+    /// Last time the Chrome extension talked to MacDub (Settings › Extensions).
+    @Published private(set) var extensionLastSeen: Date?
+
+    private func chatBridge(_ request: LiveMonitorServer.Request) -> (type: String, body: Data)? {
+        guard request.path.hasPrefix("/chat/") else { return nil }
+        // Chrome sends no Origin on an extension's GET (it has host permission, so the request is
+        // not CORS). A web page's request to 127.0.0.1 always carries its own Origin, or is a
+        // blind "no-cors" one: both are refused.
+        let fromExtension = request.origin?.hasPrefix("chrome-extension://") == true
+            || (request.origin == nil && request.fetchMode != "no-cors")
+        guard fromExtension else {
+            Log.app.notice("Chat bridge refused \(request.method, privacy: .public) \(request.path, privacy: .public) from \(request.origin ?? "-", privacy: .public) (\(request.fetchMode ?? "-", privacy: .public))")
+            return nil
+        }
+        if extensionLastSeen.map({ Date().timeIntervalSince($0) > 2 }) ?? true { extensionLastSeen = Date() }
+        func json(_ object: Any) -> (type: String, body: Data) {
+            ("application/json", (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8))
+        }
+        switch (request.method, request.path) {
+        case ("GET", "/chat/hello"):
+            return json(["app": "MacDub", "running": live.phase == .running,
+                         "sendChat": live.sendChat, "translateChat": live.translateChat])
+        case ("GET", "/chat/outbox"):
+            // virtualMic: the extension sends the virtual microphone to the call instead of
+            // Meet's own while MacDub translates with "send as audio".
+            return json(["messages": live.phase == .running ? live.takeChatOutbox() : [],
+                         "virtualMic": live.phase == .running && live.sendAudio])
+        case ("POST", "/chat/inbox"):
+            if let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+               let text = object["text"] as? String {
+                live.chatReceived(text, author: object["author"] as? String)
+            }
+            return json(["ok": true])
+        default:
+            return nil
         }
     }
 
@@ -778,7 +848,14 @@ final class AppState: ObservableObject {
                 var row: [String: Any] = ["side": line.side.rawValue, "original": line.original,
                                           "t": line.recognizedAt.timeIntervalSince1970]
                 if let t = line.translated { row["translated"] = t }
-                if let spoken = line.spokenAt { row["delay"] = spoken.timeIntervalSince(line.recognizedAt) }
+                row["via"] = line.via.rawValue
+                if let author = line.author { row["author"] = author }
+                if let spoken = line.spokenAt {
+                    row["delay"] = spoken.timeIntervalSince(line.recognizedAt)
+                    if let end = line.speechEndedAt { row["totalDelay"] = spoken.timeIntervalSince(end) }
+                }
+                if let end = line.speechEndedAt { row["recognitionDelay"] = line.recognizedAt.timeIntervalSince(end) }
+                if let t = line.translation { row["translationDelay"] = t }
                 return row
             },
         ]

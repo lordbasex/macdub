@@ -8,18 +8,28 @@ import MacDubCore
 struct HistorySectionView: View {
     @EnvironmentObject private var state: AppState
     @State private var selectedID: String?
+    /// Dubbing sessions or live translation conversations.
+    @AppStorage("historyTab") private var tab = HistoryTab.dubbing
     private let palette = Theme.amber
 
     private var selected: SessionRecord? { state.sessions.first { $0.id == selectedID } }
+    private var sessions: [SessionRecord] { state.sessions.filter { $0.isLive == (tab == .live) } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 16) {
                 HeroTile(symbol: "clock.arrow.circlepath", palette: palette, size: 64)
                     .onReceive(state.$historySelection) { id in if let id { selectedID = id } }
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("History").font(.system(size: 30, weight: .semibold)).foregroundStyle(.white)
-                    Text("Every dubbing session is saved here when it stops.").foregroundStyle(Theme.secondaryText)
+                    Picker("", selection: $tab) {
+                        ForEach(HistoryTab.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .onChange(of: tab) { _, _ in selectedID = nil }
+                    Text(tab == .live ? "Every live translation conversation is saved here when it stops."
+                                      : "Every dubbing session is saved here when it stops.")
+                        .font(.callout).foregroundStyle(Theme.secondaryText)
                 }
                 Spacer()
                 Button { state.refreshSessions() } label: { Image(systemName: "arrow.clockwise") }
@@ -50,16 +60,19 @@ struct HistorySectionView: View {
 
             HStack(spacing: 16) {
                 GlassCard(padding: 6) {
-                    if state.sessions.isEmpty {
+                    if sessions.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "clock.arrow.circlepath").font(.largeTitle).foregroundStyle(Theme.tertiaryText)
-                            Text("No sessions yet").foregroundStyle(Theme.secondaryText)
+                            Text(tab == .live ? "No conversations yet" : "No sessions yet").foregroundStyle(Theme.secondaryText)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        List(state.sessions, selection: $selectedID) { record in
+                        List(sessions, selection: $selectedID) { record in
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
+                                    if record.isLive {
+                                        Image(systemName: "person.2.wave.2.fill").font(.caption).foregroundStyle(Theme.cyan.accent)
+                                    }
                                     Text(record.appName ?? "—").font(.headline).foregroundStyle(.white)
                                     if record.audioURL != nil {
                                         Image(systemName: "waveform").font(.caption).foregroundStyle(palette.top)
@@ -68,8 +81,8 @@ struct HistorySectionView: View {
                                 }
                                 Text(record.startedAt, format: .dateTime.day().month().year().hour().minute())
                                     .font(.caption).foregroundStyle(Theme.secondaryText)
-                                Text(LF("%lld sentences · %@ → %@ · %@", record.sentenceCount, record.sourceLocale,
-                                        record.targetLanguage, durationText(record.duration)))
+                                Text(LF(record.isLive ? "%lld sentences · %@ ↔ %@ · %@" : "%lld sentences · %@ → %@ · %@",
+                                        record.sentenceCount, record.sourceLocale, record.targetLanguage, durationText(record.duration)))
                                     .font(.caption2).foregroundStyle(Theme.tertiaryText)
                             }
                             .padding(.vertical, 4)
@@ -96,6 +109,9 @@ struct HistorySectionView: View {
         .onAppear { state.refreshSessions() }
     }
 
+    /// Who spoke, at the start of each exported line of a conversation.
+    static var sideLabels: [String: String] { ["me": L("You"), "them": L("Them")] }
+
     private func durationText(_ t: TimeInterval) -> String {
         let m = Int(t) / 60, s = Int(t) % 60
         return m > 0 ? "\(m) min \(s) s" : "\(s) s"
@@ -115,7 +131,7 @@ struct HistorySectionView: View {
     private func export(_ record: SessionRecord, _ format: TranscriptExporter.Format, _ content: TranscriptExporter.Content) {
         guard let url = savePanel(name: "\(record.exportBaseName(kind: "transcript")).\(format.fileExtension)", type: nil) else { return }
         do {
-            try record.render(format, content: content).write(to: url, atomically: true, encoding: .utf8)
+            try record.render(format, content: content, sideLabels: Self.sideLabels).write(to: url, atomically: true, encoding: .utf8)
         } catch {
             state.present(message: LF("Could not save the file: %@", error.localizedDescription), suggestion: nil)
         }
@@ -132,12 +148,20 @@ struct HistorySectionView: View {
         do {
             if FileManager.default.fileExists(atPath: audioDest.path) { try FileManager.default.removeItem(at: audioDest) }
             try FileManager.default.copyItem(at: audio, to: audioDest)
-            try record.render(.srt, content: content).write(to: srtDest, atomically: true, encoding: .utf8)
+            try record.render(.srt, content: content, sideLabels: Self.sideLabels).write(to: srtDest, atomically: true, encoding: .utf8)
             NSWorkspace.shared.activateFileViewerSelecting([audioDest, srtDest])
         } catch {
             state.present(message: LF("Could not save the file: %@", error.localizedDescription), suggestion: nil)
         }
     }
+}
+
+/// History's two tabs.
+enum HistoryTab: String, CaseIterable, Identifiable {
+    case dubbing, live
+    var id: String { rawValue }
+    var title: LocalizedStringKey { self == .live ? "Live translation" : "Dubbing" }
+    var symbol: String { self == .live ? "person.2.wave.2.fill" : "waveform.and.mic" }
 }
 
 /// What History plays: the recorded audio, the translated voice over it, or the voice alone.
@@ -263,11 +287,17 @@ private struct SessionDetailView: View {
                         let isCurrent = currentIndex == index
                         let isActive = isCurrent && cue.contains(player.currentTime)
                         let progress = cue.progress(at: player.currentTime)
-                        HistoryRow(segment: seg, offset: cue.start, isCurrent: isCurrent, subtitles: subtitleMode,
-                                   originalWord: isActive ? Karaoke.wordRange(in: seg.original, progress: progress) : nil,
-                                   translatedWord: translatedWord(index: index, segment: seg, isActive: isActive, progress: progress))
-                            .id(index)
-                            .onTapGesture { if record.audioURL != nil { player.seek(to: cue.start) } }
+                        Group {
+                            if record.isLive {
+                                ConversationBubble(segment: seg, offset: cue.start, isCurrent: isCurrent, subtitles: subtitleMode)
+                            } else {
+                                HistoryRow(segment: seg, offset: cue.start, isCurrent: isCurrent, subtitles: subtitleMode,
+                                           originalWord: isActive ? Karaoke.wordRange(in: seg.original, progress: progress) : nil,
+                                           translatedWord: translatedWord(index: index, segment: seg, isActive: isActive, progress: progress))
+                            }
+                        }
+                        .id(index)
+                        .onTapGesture { if record.audioURL != nil { player.seek(to: cue.start) } }
                     }
                 }
                 .padding(16)
@@ -289,6 +319,58 @@ private struct SessionDetailView: View {
             return spoken.range
         }
         return isActive ? Karaoke.wordRange(in: translated, progress: progress) : nil
+    }
+}
+
+/// A line of a live translation conversation: yours on the right in cyan, theirs on the left,
+/// like a chat, with how long each step took.
+private struct ConversationBubble: View {
+    let segment: LiveState.SegmentDTO
+    let offset: TimeInterval
+    let isCurrent: Bool
+    let subtitles: HistorySubtitleMode
+
+    private var mine: Bool { segment.side == "me" }
+
+    var body: some View {
+        HStack {
+            if mine { Spacer(minLength: 60) }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(mine ? "You" : "Them").font(.caption.weight(.semibold))
+                        .foregroundStyle(mine ? Theme.cyan.accent : Theme.secondaryText)
+                    if let author = segment.author { Text(author).font(.caption).foregroundStyle(Theme.secondaryText) }
+                    if segment.via == "chat" { Image(systemName: "bubble.left.fill").font(.caption2).foregroundStyle(Theme.cyan.accent) }
+                    if segment.via == "typed" { Image(systemName: "keyboard").font(.caption2).foregroundStyle(Theme.cyan.accent) }
+                    Text(TranscriptExporter.clock(offset)).font(.caption2).monospacedDigit()
+                        .foregroundStyle(isCurrent ? Color.yellow : Theme.tertiaryText)
+                }
+                if subtitles.showsOriginal {
+                    Text(segment.original).font(subtitles == .original ? .body.weight(.medium) : .callout)
+                        .foregroundStyle(subtitles == .original ? .white : Theme.secondaryText)
+                }
+                if subtitles.showsTranslation, let t = segment.translated {
+                    Text(t).font(.body.weight(.medium)).foregroundStyle(isCurrent ? Color.yellow.opacity(0.95) : .white)
+                }
+                if let timings { Text(timings).font(.caption2).monospacedDigit().foregroundStyle(Theme.tertiaryText) }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background((mine ? Theme.cyan.accent.opacity(0.18) : Color.white.opacity(0.08)),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(isCurrent ? Color.yellow.opacity(0.6) : .clear))
+            if !mine { Spacer(minLength: 60) }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var timings: String? {
+        let spoken = segment.spokenAt
+        let parts = [
+            segment.speechEndedAt.map { LF("Transcription %.1f s", segment.recognizedAt.timeIntervalSince($0)) },
+            spoken.map { LF("Audio %.1f s", $0.timeIntervalSince(segment.recognizedAt)) },
+            spoken.map { LF("Total %.1f s", $0.timeIntervalSince(segment.speechEndedAt ?? segment.recognizedAt)) },
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
     }
 }
 

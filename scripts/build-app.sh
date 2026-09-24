@@ -87,6 +87,11 @@ fi
 if [[ -f "$ROOT/Packaging/AppIcon.icns" ]]; then
   cp "$ROOT/Packaging/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 fi
+# The Chrome extension for live translation in Meet: Settings › Extensions installs it from here.
+if [[ -d "$ROOT/extensions/meet-chat" ]]; then
+  rm -rf "$APP/Contents/Resources/meet-extension"
+  cp -R "$ROOT/extensions/meet-chat" "$APP/Contents/Resources/meet-extension"
+fi
 
 echo "▶ codesign (identity: $CODESIGN_IDENTITY)"
 SIGN_FLAGS=(--force --sign "$CODESIGN_IDENTITY" --entitlements "$ROOT/Packaging/MacDub.entitlements" --options runtime)

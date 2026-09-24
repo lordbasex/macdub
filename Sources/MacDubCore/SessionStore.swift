@@ -14,10 +14,16 @@ public struct SessionRecord: Codable, Identifiable, Equatable {
     /// File name of the recorded original audio inside `MacDubPaths.audioDirectory`, when the
     /// session was recorded. Absent for sessions saved before recording existed or with it off.
     public var audioFile: String?
+    /// What the session was: nil for dubbing (and for files saved before live translation),
+    /// `liveKind` for a live translation conversation (sourceLocale = yours, targetLanguage =
+    /// theirs; each segment says who spoke).
+    public var kind: String?
+    public static let liveKind = "live"
+    public var isLive: Bool { kind == Self.liveKind }
 
     public init(id: String = UUID().uuidString, startedAt: Date, endedAt: Date = Date(), appName: String?,
                 appBundleIdentifier: String?, sourceLocale: String, targetLanguage: String, segments: [Segment],
-                audioFile: String? = nil) {
+                audioFile: String? = nil, kind: String? = nil) {
         self.id = id
         self.startedAt = startedAt
         self.endedAt = endedAt
@@ -27,6 +33,7 @@ public struct SessionRecord: Codable, Identifiable, Equatable {
         self.targetLanguage = targetLanguage
         self.segments = segments.map(LiveState.SegmentDTO.init)
         self.audioFile = audioFile
+        self.kind = kind
     }
 
     public var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }
@@ -45,9 +52,21 @@ public struct SessionRecord: Codable, Identifiable, Equatable {
         TranscriptExporter.Metadata(appName: appName, sourceLanguage: sourceLocale, targetLanguage: targetLanguage)
     }
 
-    public func render(_ format: TranscriptExporter.Format, content: TranscriptExporter.Content = .both) -> String {
-        TranscriptExporter.render(segments.map(\.segment), format: format, content: content,
-                                  sessionStart: startedAt, metadata: metadata)
+    /// `sideLabels` names who spoke in a live translation ("me" → "You", "them" → "Them"): each
+    /// line of the export starts with it.
+    public func render(_ format: TranscriptExporter.Format, content: TranscriptExporter.Content = .both,
+                       sideLabels: [String: String] = [:]) -> String {
+        let lines = segments.map { dto -> Segment in
+            var segment = dto.segment
+            guard let side = dto.side, let label = sideLabels[side] else { return segment }
+            let who = dto.author.map { "\(label) (\($0))" } ?? label
+            var labelled = Segment(original: "\(who): \(segment.original)",
+                                   translated: segment.translated.map { "\(who): \($0)" }, recognizedAt: segment.recognizedAt)
+            labelled.spokenAt = segment.spokenAt
+            segment = labelled
+            return segment
+        }
+        return TranscriptExporter.render(lines, format: format, content: content, sessionStart: startedAt, metadata: metadata)
     }
 
     /// Short human title: "Google Chrome · 22 Sep 2026 13:05 · 48 sentences".

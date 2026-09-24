@@ -15,6 +15,14 @@ public struct Segment: Identifiable, Equatable, Sendable {
     /// Speaker index when a diarization source assigns one (none of Apple's frameworks do
     /// today; the field is here so voices-per-speaker can be wired without touching the model).
     public var speaker: Int?
+    /// Live translation: who said it — "me" (you, into the call) or "them" (the call, to you).
+    public var side: String?
+    /// Live translation: how it arrived — "voice", "chat" or "typed".
+    public var via: String?
+    /// Live translation: who wrote a chat message.
+    public var author: String?
+    /// Live translation: when the speaker went quiet after the sentence.
+    public var speechEndedAt: Date?
 
     public init(original: String, translated: String? = nil, recognizedAt: Date = Date()) {
         self.original = original

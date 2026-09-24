@@ -10,17 +10,33 @@ public struct LiveState: Codable, Equatable {
         public var translated: String?
         public var recognizedAt: Date
         public var spokenAt: Date?
+        // Live translation only (absent in dubbing sessions and in files saved before it).
+        public var side: String?
+        public var via: String?
+        public var author: String?
+        public var speechEndedAt: Date?
+        public var translatedAt: Date?
 
         public init(_ segment: Segment) {
             original = segment.original
             translated = segment.translated
             recognizedAt = segment.recognizedAt
             spokenAt = segment.spokenAt
+            side = segment.side
+            via = segment.via
+            author = segment.author
+            speechEndedAt = segment.speechEndedAt
+            translatedAt = segment.translatedAt
         }
 
         public var segment: Segment {
             var s = Segment(original: original, translated: translated, recognizedAt: recognizedAt)
             s.spokenAt = spokenAt
+            s.translatedAt = translatedAt
+            s.side = side
+            s.via = via
+            s.author = author
+            s.speechEndedAt = speechEndedAt
             return s
         }
     }
@@ -137,6 +153,7 @@ public enum MacDubCommand {
         case setOriginalVolume // level: 0…1, duckOnlyWhileSpeaking?: "true"/"false"
         case exportAudio       // seconds, path → the app writes a 16 kHz mono WAV of the last N seconds
         case snapshotUI        // path, label → PNGs of every screen (light + dark), then <label>.done
+        case startLive, stopLive  // live translation with its current settings (testing, automation)
     }
 
     public static func post(_ action: Action, bundleIdentifier: String? = nil, values: [String: String] = [:]) {
