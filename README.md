@@ -228,17 +228,17 @@ MacDub's two speech engines were benchmarked on the same audio through the real 
 
 | | SpeechAnalyzer (macOS 26) | SFSpeechRecognizer |
 |---|---|---|
-| Sentences spoken whole (one segment) | **85 %** | 61 % |
-| Word error rate | **9.8 %** | 22.9 % |
-| Words lost | **1.3 %** | 7.1 % |
+| Sentences spoken whole (one segment) | **88 %** | 61 % |
+| Word error rate | **10.3 %** | 22.9 % |
+| Words lost | **1.4 %** | 7.1 % |
 | Sentence ends found (recall) | **90 %** | 42 % |
 | Questions ending in `?` | **19/26** | 7/23 |
-| Latency, median · p90 · max | 2.3 s · 4.1 s · 12.4 s | 1.0 s · 2.4 s · 8.9 s |
+| Latency, median · p90 · max | **0.7 s · 2.4 s · 9.3 s** | 1.0 s · 2.4 s · 8.9 s |
 | Speech service CPU (avg) | **4.8 %** | 25.5 % |
 
 SFSpeechRecognizer's segmentation was rewritten after 0.3.1. On the same audio it went from 14.7 % of the words lost and 55 % of sentences whole to 7.1 % and 61 %, with a worst latency of 8.9 s instead of 22.3 s ([what changed](docs/benchmarks/2026-09-24-apple-m1.md#sfspeechrecognizer-new-segmentation)).
 
-SpeechAnalyzer waits for its finalized, corrected sentences; after 10 s without one it speaks what it has up to the last comma, trading a few whole sentences (92 → 85 %) for no long silences ([details](docs/benchmarks/2026-09-23-apple-m1.md#update-latency-cap-macdub-031), macOS 26.7).
+SpeechAnalyzer now runs with fast results: its sentences come out three times sooner (median 2.3 → 0.7 s) with as many whole sentences ([details](docs/benchmarks/2026-09-24-apple-m1.md#update-speechanalyzer-with-fast-results)). It waits for its finalized, corrected sentences; after 10 s without one it speaks what it has up to the last comma, trading a few whole sentences (92 → 85 %) for no long silences ([details](docs/benchmarks/2026-09-23-apple-m1.md#update-latency-cap-macdub-031), macOS 26.7).
 
 Run it on your Mac — especially M2, M3, M4, M5 and M6, which haven't been measured yet — and send the report as a pull request:
 
@@ -274,7 +274,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - Latency of roughly 1–3 s is inherent to sentence-by-sentence dubbing.
 - On-device speech languages are limited to those with a downloaded Dictation model (usually the system language plus en-US).
 - `SFSpeechRecognizer` punctuates poorly and misses about 7 % of the words in the benchmark (the recognizer itself, not the pipeline); on macOS 26 `SpeechAnalyzer` is used instead when available.
-- With `SpeechAnalyzer` a sentence is spoken once it is complete — about 2.3 s after it ends (median), a little later than `SFSpeechRecognizer`'s fragments, in exchange for whole sentences. When SpeechAnalyzer holds a sentence back (it sometimes merges two), MacDub speaks it after at most ~10–12 s.
+- With `SpeechAnalyzer` a sentence is spoken once it is complete — about 0.7 s after it ends (median), in whole sentences. When SpeechAnalyzer holds a sentence back (it sometimes merges two), MacDub speaks it after at most ~10–12 s.
 - Safari plays audio through shared WebKit XPC processes; tapping Safari can affect other WebKit apps.
 - No speaker diarization: everyone gets the same voice (the data model has a `speaker` field ready for it).
 - Siri voices cannot be used by third-party apps.

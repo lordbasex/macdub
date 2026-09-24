@@ -83,8 +83,10 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     var finalizeAfterPause: TimeInterval = 0
     /// Translate each segment through `translator` (live translation translates on its own).
     var translatesSegments = true
-    /// Live translation: SpeechAnalyzer's `.fastResults` (see `SpeechAnalyzerEngine.fastResults`).
-    var analyzerFastResults = false
+    /// SpeechAnalyzer's `.fastResults` (see `SpeechAnalyzerEngine.fastResults`). On for dubbing
+    /// too: on the 30-minute benchmark the voice starts after 0.7 s instead of 2.3 s
+    /// (median), with as many whole sentences (88 vs 85 %) and WER 10.3 vs 9.8 %.
+    var analyzerFastResults = true
     /// The pause `finalizeAtPause` was already asked for (once per pause).
     private var finalizedPause: Date?
 

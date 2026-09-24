@@ -5,7 +5,7 @@
 **Pipeline.** MacDub runs headless (`MacDub --benchmark-recognition <file> --engine <analyzer|legacy>`): the file is converted to what the capture engines deliver (mono float32, 48 kHz, 1024-frame buffers) and fed to the real `SpeechAndTranslationManager` **in real time**, so run rotation, silence cuts and segmentation behave exactly as while dubbing. Every emitted segment — the unit that gets translated and spoken — is recorded with the audio time it came out at. Translation and speech synthesis are not part of the measurement.
 
 **Engines.**
-- **SpeechAnalyzer** (macOS 26+): `SpeechTranscriber` with volatile results. MacDub segments its *finalized* results — whole, corrected sentences — and only shows the volatile ones live.
+- **SpeechAnalyzer** (macOS 26+): `SpeechTranscriber` with volatile and fast results (fast since 2026-09-24; `--no-fast-results` measures without them). MacDub segments its *finalized* results — whole, corrected sentences — and only shows the volatile ones live.
 - **SpeechAnalyzer (volatile)** (`--analyzer-volatile`, optional): the older behaviour, segmenting volatile results as they arrive.
 - **SFSpeechRecognizer**: on-device recognition with partial results. Runs are rotated at the first pause in the audio after 30 s (at 45 s at the latest) and on real silence; a rotated run finishes its audio instead of being cancelled.
 

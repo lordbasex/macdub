@@ -52,8 +52,9 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         return installed.contains { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
     }
 
-    /// Live translation: `.fastResults`. Without it SpeechAnalyzer may process a conversation
-    /// (a sentence, then silence) in blocks of ~12 s of audio, so each sentence waited that long.
+    /// `.fastResults`. Without it SpeechAnalyzer may process a conversation (a sentence, then
+    /// silence) in blocks of ~12 s of audio, so each sentence waited that long; while dubbing it
+    /// cuts the median delay from 2.3 to 0.7 s. The manager turns it on.
     var fastResults = false
 
     func start(locale: Locale) throws {

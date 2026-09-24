@@ -109,7 +109,8 @@ enum RecognitionBenchmark {
         manager.analyzerHardCap = value("--analyzer-cap", in: args).flatMap(Double.init)
         // --finalize-after <s>: finalize at pauses this long (live translation).
         manager.finalizeAfterPause = value("--finalize-after", in: args).flatMap(Double.init) ?? 0
-        manager.analyzerFastResults = args.contains("--fast-results")
+        // --no-fast-results: SpeechAnalyzer without .fastResults (MacDub up to 0.4.2).
+        manager.analyzerFastResults = !args.contains("--no-fast-results")
         let process = ProcessSampler()
         let clock = ContinuousClock()
         let started = clock.now
