@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, live-translation-pilot]
+    branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
