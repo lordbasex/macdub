@@ -376,3 +376,32 @@
 "Personal Voice isn't available on this Mac. It needs macOS 14 or later, and creating one needs a Mac with Apple silicon." = "Personal Voice isn't available on this Mac. It needs macOS 14 or later, and creating one needs a Mac with Apple silicon.";
 "Record your voice (about 15 minutes of reading aloud); only System Settings can create it" = "Record your voice (about 15 minutes of reading aloud); only System Settings can create it";
 "Create in System Settings…" = "Create in System Settings…";
+
+/* Live translation */
+"Live translation" = "Live translation";
+"Beta" = "Beta";
+"Talk with people in another language through Meet, Zoom or any call app. What you say reaches them translated, in the voice you choose; what they say reaches your headphones in your language." = "Talk with people in another language through Meet, Zoom or any call app. What you say reaches them translated, in the voice you choose; what they say reaches your headphones in your language.";
+"Live translation needs macOS 26 or later: it listens to you and to the call at the same time with SpeechAnalyzer." = "Live translation needs macOS 26 or later: it listens to you and to the call at the same time with SpeechAnalyzer.";
+"Call app" = "Call app";
+"Your language" = "Your language";
+"Their language" = "Their language";
+"Your voice for them" = "Your voice for them";
+"Their voice for you" = "Their voice for you";
+"Virtual microphone: %@. In the call app, choose it as the microphone." = "Virtual microphone: %@. In the call app, choose it as the microphone.";
+"No virtual microphone (%@). Install it: brew install --cask blackhole-2ch, then restart the audio (sudo killall coreaudiod)." = "No virtual microphone (%@). Install it: brew install --cask blackhole-2ch, then restart the audio (sudo killall coreaudiod).";
+"Headphones in use." = "Headphones in use.";
+"Sound goes to the Mac's speakers: use headphones (AirPods, wired…), or your microphone will send their translated voice back to them." = "Sound goes to the Mac's speakers: use headphones (AirPods, wired…), or your microphone will send their translated voice back to them.";
+"Check again" = "Check again";
+"Translating with %@" = "Translating with %@";
+"You" = "You";
+"Them" = "Them";
+"(not translated)" = "(not translated)";
+"voice after %.1f s" = "voice after %.1f s";
+"Open monitor" = "Open monitor";
+"Monitor" = "Monitor";
+"Could not start the monitor page." = "Could not start the monitor page.";
+"Stop live translation first." = "Stop live translation first.";
+"Live translation needs macOS 26 or later." = "Live translation needs macOS 26 or later.";
+"No %@ audio device. Install it with: brew install --cask blackhole-2ch" = "No %@ audio device. Install it with: brew install --cask blackhole-2ch";
+"MacDub may not use the microphone. Allow it in System Settings › Privacy & Security › Microphone." = "MacDub may not use the microphone. Allow it in System Settings › Privacy & Security › Microphone.";
+"Download the %@ → %@ translation first (System Settings › General › Language & Region › Translation Languages)." = "Download the %@ → %@ translation first (System Settings › General › Language & Region › Translation Languages).";

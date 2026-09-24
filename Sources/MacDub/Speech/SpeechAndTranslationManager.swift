@@ -81,6 +81,8 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     /// Live translation: when the speaker pauses this long, ask the engine to finalize what it
     /// heard (a conversation has a sentence and then silence; dubbing leaves it off). 0: never.
     var finalizeAfterPause: TimeInterval = 0
+    /// Translate each segment through `translator` (live translation translates on its own).
+    var translatesSegments = true
     /// Live translation: SpeechAnalyzer's `.fastResults` (see `SpeechAnalyzerEngine.fastResults`).
     var analyzerFastResults = false
     /// The pause `finalizeAtPause` was already asked for (once per pause).
@@ -381,6 +383,7 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         var segment = Segment(original: text)
         Log.speech.info("Segment: \(text, privacy: .public)")
         onSegmentRecognized?(segment)
+        guard translatesSegments else { return }
 
         Task { [weak self, translator, queue] in
             do {

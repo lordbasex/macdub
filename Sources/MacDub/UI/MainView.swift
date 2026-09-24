@@ -73,6 +73,7 @@ struct MainView: View {
     private var detail: some View {
         switch state.section {
         case .dub: DubSectionView()
+        case .live: LiveTranslationSectionView(live: state.live, monitor: state.liveMonitor)
         case .subtitles: SubtitlesSectionView()
         case .history: HistorySectionView()
         case .ai: AISectionView()

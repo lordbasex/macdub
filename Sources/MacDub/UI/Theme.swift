@@ -20,6 +20,9 @@ enum Theme {
                                accent: Color(red: 1.0, green: 0.62, blue: 0.25))
     static let azure = Palette(top: Color(red: 0.10, green: 0.32, blue: 0.80), bottom: Color(red: 0.04, green: 0.08, blue: 0.28),
                                accent: Color(red: 0.35, green: 0.70, blue: 1.0))
+    /// Live translation: the cyan of Apple's own live translation.
+    static let cyan = Palette(top: Color(red: 0.04, green: 0.42, blue: 0.52), bottom: Color(red: 0.02, green: 0.10, blue: 0.17),
+                              accent: Color(red: 0.37, green: 0.83, blue: 0.88))
     static let emerald = Palette(top: Color(red: 0.08, green: 0.48, blue: 0.40), bottom: Color(red: 0.03, green: 0.14, blue: 0.14),
                                  accent: Color(red: 0.35, green: 0.90, blue: 0.70))
 
@@ -31,13 +34,14 @@ enum Theme {
 
 /// Sections of the main window; each carries its own palette.
 enum AppSection: String, CaseIterable, Identifiable {
-    case dub, subtitles, history, ai
+    case dub, live, subtitles, history, ai
 
     var id: String { rawValue }
 
     var title: LocalizedStringKey {
         switch self {
         case .dub: return "Dubbing"
+        case .live: return "Live translation"
         case .subtitles: return "Subtitles"
         case .history: return "History"
         case .ai: return "AI & MCP"
@@ -47,6 +51,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .dub: return "waveform.and.mic"
+        case .live: return "person.2.wave.2.fill"
         case .subtitles: return "captions.bubble.fill"
         case .history: return "clock.arrow.circlepath"
         case .ai: return "sparkles"
@@ -56,6 +61,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var palette: Theme.Palette {
         switch self {
         case .dub: return Theme.violet
+        case .live: return Theme.cyan
         case .subtitles: return Theme.magenta
         case .history: return Theme.amber
         case .ai: return Theme.azure

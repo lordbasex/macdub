@@ -1,9 +1,85 @@
+import Foundation
+import Network
+
+/// A debugging page for live translation, served on 127.0.0.1 only: the live transcript of both
+/// sides and a latency meter (the browser times your microphone against the virtual one).
+/// Started from the Live translation screen; nothing listens until then.
+@MainActor
+final class LiveMonitorServer: ObservableObject {
+    @Published private(set) var url: URL?
+    private var listener: NWListener?
+    private let queue = DispatchQueue(label: "com.lordbasex.MacDub.live-monitor")
+    /// JSON with the current state; read on the main actor for every request.
+    var state: () -> [String: Any] = { [:] }
+
+    func start(port: UInt16 = 8765) throws {
+        if url != nil { return }
+        var lastError: Error?
+        for candidate in port..<(port + 20) {
+            do {
+                let parameters = NWParameters.tcp
+                parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: candidate)!)
+                parameters.allowLocalEndpointReuse = true
+                let listener = try NWListener(using: parameters)
+                listener.newConnectionHandler = { [weak self] connection in
+                    Task { @MainActor in self?.serve(connection) }
+                }
+                listener.start(queue: queue)
+                self.listener = listener
+                url = URL(string: "http://127.0.0.1:\(candidate)/")
+                return
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError ?? URLError(.cannotConnectToHost)
+    }
+
+    func stop() {
+        listener?.cancel()
+        listener = nil
+        url = nil
+    }
+
+    private func serve(_ connection: NWConnection) {
+        connection.start(queue: queue)
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { [weak self] data, _, _, _ in
+            let request = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            let path = request.split(separator: " ").dropFirst().first.map(String.init) ?? "/"
+            // DNS rebinding: a web page could point its own name at 127.0.0.1 and read the
+            // transcript. Only a Host naming this machine is served.
+            let host = request.split(separator: "\r\n").first { $0.lowercased().hasPrefix("host:") }?
+                .dropFirst(5).trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+            let hostName = host.split(separator: ":").first.map(String.init) ?? ""
+            Task { @MainActor in
+                guard let self else { connection.cancel(); return }
+                guard hostName == "127.0.0.1" || hostName == "localhost" else {
+                    let head = "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in connection.cancel() })
+                    return
+                }
+                let (type, body): (String, Data)
+                if path.hasPrefix("/state") {
+                    type = "application/json"
+                    body = (try? JSONSerialization.data(withJSONObject: self.state())) ?? Data("{}".utf8)
+                } else {
+                    type = "text/html; charset=utf-8"
+                    body = Data(Self.page.utf8)
+                }
+                var head = "HTTP/1.1 200 OK\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\n"
+                head += "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+                connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
+            }
+        }
+    }
+
+    static let page = #"""
 <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MacDub latency</title>
+<title>MacDub live monitor</title>
 <style>
   :root { --bg:#16121f; --panel:#221b30; --text:#eee8f6; --muted:#a79bbd; --you:#f0a35e; --voice:#5ed3e0; --line:#3a3050; }
   * { box-sizing:border-box; }
@@ -25,13 +101,25 @@
   table { border-collapse:collapse; width:100%; max-width:760px; font-variant-numeric:tabular-nums; }
   td, th { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); font-size:14px; }
   th { color:var(--muted); font-weight:500; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:8px; }
+  @media (max-width:700px) { .cols { grid-template-columns:1fr; } }
+  h2 { font-size:16px; margin:0 0 8px; } h2 small { color:var(--muted); font-weight:400; }
+  .lines { background:var(--panel); border-radius:12px; padding:12px; height:320px; overflow-y:auto; }
+  .line { margin-bottom:10px; } .line .o { color:var(--muted); font-size:13px; }
+  .line .t { font-size:16px; } .line .d { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
-<h1>Latencia de Traducción en vivo</h1>
+<h1>Traducción en vivo · monitor</h1>
+<p id="status">Conectando con MacDub…</p>
+<div class="cols">
+  <div><h2>Vos <small id="mylang"></small></h2><div id="me" class="lines"></div></div>
+  <div><h2>Ellos <small id="theirlang"></small></h2><div id="them" class="lines"></div></div>
+</div>
+<h1 style="margin-top:28px">Latencia</h1>
 <p>Escucha a la vez tu micrófono (lo que decís) y la salida de MacDub (BlackHole 2ch, lo que recibiría Meet) con el mismo reloj.
 Mide desde que terminás cada frase hasta que empieza la voz traducida: la demora de MacDub, sin Meet ni internet.
-Tené corriendo el piloto (<code>--pilot-live</code>) y hablá con pausas.</p>
+Con Traducción en vivo en marcha, hablá con pausas.</p>
 
 <div class="row">
   <label>Tu micrófono <select id="mic"></select></label>
@@ -179,6 +267,31 @@ function draw() {
 document.getElementById('start').onclick = () => start().catch(e => alert(e.message));
 document.getElementById('reset').onclick = () => { results.length = 0; tracks.mic.segments = []; tracks.out.segments = []; render(); };
 listDevices().catch(e => alert('Micrófono: ' + e.message));
+
+// Live transcript from MacDub (this page is served by the app).
+async function poll() {
+  try {
+    const s = await (await fetch('/state', { cache: 'no-store' })).json();
+    document.getElementById('status').textContent = s.phase === 'running'
+      ? 'MacDub traduciendo en vivo.' : 'MacDub no está traduciendo (' + s.phase + ').';
+    document.getElementById('mylang').textContent = s.myLocale + ' → ' + s.theirLocale;
+    document.getElementById('theirlang').textContent = s.theirLocale + ' → ' + s.myLocale;
+    for (const side of ['me', 'them']) {
+      const box = document.getElementById(side);
+      const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+      box.innerHTML = s.lines.filter(l => l.side === side).map(l =>
+        `<div class="line"><div class="o">${esc(l.original)}</div><div class="t">${esc(l.translated ?? '…')}</div>` +
+        `<div class="d">${l.delay != null ? 'voz a los ' + l.delay.toFixed(2) + ' s del texto' : ''}</div></div>`).join('');
+      if (atBottom) box.scrollTop = box.scrollHeight;
+    }
+  } catch { document.getElementById('status').textContent = 'Sin conexión con MacDub.'; }
+  setTimeout(poll, 500);
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+poll();
 </script>
 </body>
 </html>
+
+"""#
+}

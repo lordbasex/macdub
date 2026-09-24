@@ -407,3 +407,32 @@
 "Personal Voice isn't available on this Mac. It needs macOS 14 or later, and creating one needs a Mac with Apple silicon." = "Voz personal no está disponible en esta Mac. Requiere macOS 14 o posterior, y para crearla hace falta una Mac con Apple silicon.";
 "Record your voice (about 15 minutes of reading aloud); only System Settings can create it" = "Graba tu voz (unos 15 minutos leyendo en voz alta); solo Ajustes del Sistema puede crearla";
 "Create in System Settings…" = "Crear en Ajustes…";
+
+/* Live translation */
+"Live translation" = "Traducción en vivo";
+"Beta" = "Beta";
+"Talk with people in another language through Meet, Zoom or any call app. What you say reaches them translated, in the voice you choose; what they say reaches your headphones in your language." = "Habla con personas en otro idioma por Meet, Zoom o cualquier app de llamadas. Lo que dices les llega traducido, con la voz que elijas; lo que dicen te llega a los auriculares en tu idioma.";
+"Live translation needs macOS 26 or later: it listens to you and to the call at the same time with SpeechAnalyzer." = "Traducción en vivo requiere macOS 26 o posterior: escucha a la vez tu voz y la llamada con SpeechAnalyzer.";
+"Call app" = "App de la llamada";
+"Your language" = "Tu idioma";
+"Their language" = "Su idioma";
+"Your voice for them" = "Tu voz para ellos";
+"Their voice for you" = "Su voz para ti";
+"Virtual microphone: %@. In the call app, choose it as the microphone." = "Micrófono virtual: %@. En la app de la llamada, elígelo como micrófono.";
+"No virtual microphone (%@). Install it: brew install --cask blackhole-2ch, then restart the audio (sudo killall coreaudiod)." = "No hay micrófono virtual (%@). Instálalo: brew install --cask blackhole-2ch y reinicia el audio (sudo killall coreaudiod).";
+"Headphones in use." = "Usando auriculares.";
+"Sound goes to the Mac's speakers: use headphones (AirPods, wired…), or your microphone will send their translated voice back to them." = "El sonido sale por los parlantes de la Mac: usa auriculares (AirPods, con cable…) o tu micrófono les devolverá su propia voz traducida.";
+"Check again" = "Volver a comprobar";
+"Translating with %@" = "Traduciendo con %@";
+"You" = "Tú";
+"Them" = "Ellos";
+"(not translated)" = "(sin traducir)";
+"voice after %.1f s" = "voz a los %.1f s";
+"Open monitor" = "Abrir monitor";
+"Monitor" = "Monitor";
+"Could not start the monitor page." = "No se pudo iniciar la página del monitor.";
+"Stop live translation first." = "Detén primero la traducción en vivo.";
+"Live translation needs macOS 26 or later." = "Traducción en vivo requiere macOS 26 o posterior.";
+"No %@ audio device. Install it with: brew install --cask blackhole-2ch" = "No hay dispositivo de audio %@. Instálalo con: brew install --cask blackhole-2ch";
+"MacDub may not use the microphone. Allow it in System Settings › Privacy & Security › Microphone." = "MacDub no tiene permiso para usar el micrófono. Permítelo en Ajustes del Sistema › Privacidad y seguridad › Micrófono.";
+"Download the %@ → %@ translation first (System Settings › General › Language & Region › Translation Languages)." = "Descarga primero la traducción %@ → %@ (Ajustes del Sistema › General › Idioma y región › Idiomas de traducción).";

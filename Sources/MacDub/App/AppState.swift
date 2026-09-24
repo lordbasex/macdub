@@ -104,6 +104,9 @@ final class AppState: ObservableObject {
 
     let settings = Settings()
     let translation = TranslationBridge()
+    /// Live translation (a conversation through a call app) and its debugging page.
+    let live = LiveTranslationController()
+    let liveMonitor = LiveMonitorServer()
 
     // MARK: Pipeline
 
@@ -750,7 +753,42 @@ final class AppState: ObservableObject {
 
     // MARK: Start / stop
 
+    func toggleLiveTranslation() {
+        Task {
+            if live.phase == .running { await live.stop() }
+            else if live.phase == .idle, phase == .idle, let target = selectedTarget { await live.start(target: target) }
+        }
+    }
+
+    /// Serves the live translation page on 127.0.0.1 and opens it in the browser.
+    func openLiveMonitor() {
+        liveMonitor.state = { [weak self] in self?.liveState() ?? [:] }
+        do {
+            try liveMonitor.start()
+            if let url = liveMonitor.url { NSWorkspace.shared.open(url) }
+        } catch {
+            present(message: L("Could not start the monitor page."), suggestion: error.localizedDescription)
+        }
+    }
+
+    private func liveState() -> [String: Any] {
+        [
+            "phase": live.phase.rawValue, "myLocale": live.myLocaleID, "theirLocale": live.theirLocaleID,
+            "lines": live.lines.suffix(200).map { line -> [String: Any] in
+                var row: [String: Any] = ["side": line.side.rawValue, "original": line.original,
+                                          "t": line.recognizedAt.timeIntervalSince1970]
+                if let t = line.translated { row["translated"] = t }
+                if let spoken = line.spokenAt { row["delay"] = spoken.timeIntervalSince(line.recognizedAt) }
+                return row
+            },
+        ]
+    }
+
     func toggle() {
+        guard live.phase == .idle else {
+            present(message: L("Stop live translation first."), suggestion: nil)
+            return
+        }
         Task {
             if phase == .running { await stop() } else if phase == .idle { await start() }
         }

@@ -82,13 +82,13 @@ extension LivePilot {
         // The first translation loads the model (~2.7 s measured): do it before anyone speaks.
         _ = try? await session.translate("Hola")
         let log = SentenceLog()
-        let speaker = try DeviceSpeaker(device: device)
+        let speaker = try LiveDeviceSpeaker(device: device)
         let clock = Date()
         let now: @Sendable () -> Double = { Date().timeIntervalSince(clock) }
 
         let manager = SpeechAndTranslationManager(translator: await TranslationBridge())
-        let mic = try Microphone { buffer, loud in
-            if loud { log.heard(at: now()) }
+        let mic = LiveMicrophone { buffer, peak in
+            if peak > 0.02 { log.heard(at: now()) }
             manager.append(buffer)
         }
         manager.onSegmentRecognized = { segment in
@@ -97,7 +97,7 @@ extension LivePilot {
                 do {
                     let translated = try await session.translate(segment.original).targetText
                     log.translated(id, translated, at: now())
-                    let buffers = try await render(text: translated, voice: voice)
+                    let buffers = await LiveAudio.render(translated, voice: voice)
                     await speaker.enqueue(buffers) { log.spoken(id, at: now()) }
                 } catch {
                     log.failed(id, error.localizedDescription)
@@ -105,6 +105,7 @@ extension LivePilot {
             }
         }
         manager.finalizeAfterPause = Double(arg("--finalize-after", in: args) ?? "0.5") ?? 0.5
+        manager.translatesSegments = false
         manager.analyzerFastResults = !args.contains("--no-fast-results")
         try manager.start(sourceLocale: from, engineKind: .analyzer)
         try mic.start()
@@ -121,25 +122,6 @@ extension LivePilot {
         ]
     }
 
-    /// `AVSpeechSynthesizer.write` into buffers (the voice goes to a device, not the speakers).
-    fileprivate static func render(text: String, voice: AVSpeechSynthesisVoice?) async throws -> [AVAudioPCMBuffer] {
-        let synthesizer = AVSpeechSynthesizer()
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = voice
-        return await withCheckedContinuation { cont in
-            var list: [AVAudioPCMBuffer] = []
-            var done = false
-            synthesizer.write(utterance) { buffer in
-                guard !done else { return }
-                guard let pcm = buffer as? AVAudioPCMBuffer, pcm.frameLength > 0 else {
-                    done = true
-                    withExtendedLifetime(synthesizer) { cont.resume(returning: list) }
-                    return
-                }
-                list.append(pcm)
-            }
-        }
-    }
 }
 
 /// Per-sentence timeline of the pilot.
@@ -175,66 +157,3 @@ private final class SentenceLog: @unchecked Sendable {
     }
 }
 
-/// The default input device, delivered as MacDub's capture format (mono float32, 48 kHz).
-private final class Microphone {
-    private let engine = AVAudioEngine()
-    private let onBuffer: (AVAudioPCMBuffer, Bool) -> Void
-
-    init(onBuffer: @escaping (AVAudioPCMBuffer, Bool) -> Void) throws {
-        self.onBuffer = onBuffer
-    }
-
-    func start() throws {
-        let input = engine.inputNode
-        let inFormat = input.outputFormat(forBus: 0)
-        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
-        guard let converter = AVAudioConverter(from: inFormat, to: format) else { throw NSError(domain: "pilot", code: 1) }
-        input.installTap(onBus: 0, bufferSize: 1024, format: inFormat) { [onBuffer] buffer, _ in
-            let capacity = AVAudioFrameCount(Double(buffer.frameLength) * 48_000 / inFormat.sampleRate) + 32
-            guard let out = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return }
-            var consumed = false
-            converter.convert(to: out, error: nil) { _, status in
-                if consumed { status.pointee = .noDataNow; return nil }
-                consumed = true; status.pointee = .haveData; return buffer
-            }
-            var peak: Float = 0
-            if let ch = out.floatChannelData { for i in 0..<Int(out.frameLength) { peak = max(peak, abs(ch[0][i])) } }
-            onBuffer(out, peak > 0.02)
-        }
-        try engine.start()
-    }
-
-    func stop() {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-    }
-}
-
-/// Plays sentences one after another on one output device.
-private actor DeviceSpeaker {
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
-    private var connected = false
-
-    init(device: AudioDeviceID) throws {
-        guard let unit = engine.outputNode.audioUnit else { throw NSError(domain: "pilot", code: 2) }
-        var id = device
-        let status = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                                          &id, UInt32(MemoryLayout<AudioDeviceID>.size))
-        guard status == noErr else { throw NSError(domain: "pilot", code: Int(status)) }
-        engine.attach(player)
-    }
-
-    func enqueue(_ buffers: [AVAudioPCMBuffer], started: @escaping @Sendable () -> Void) async {
-        guard let first = buffers.first else { return }
-        if !connected {
-            engine.connect(player, to: engine.mainMixerNode, format: first.format)
-            try? engine.start()
-            player.play()
-            connected = true
-        }
-        // The first buffer's playback start ≈ when the voice starts.
-        player.scheduleBuffer(first, completionCallbackType: .dataConsumed) { _ in started() }
-        for b in buffers.dropFirst() { player.scheduleBuffer(b, completionHandler: nil) }
-    }
-}
