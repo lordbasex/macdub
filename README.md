@@ -228,13 +228,13 @@ MacDub's two speech engines were benchmarked on the same audio through the real 
 
 | | SpeechAnalyzer (macOS 26) | SFSpeechRecognizer |
 |---|---|---|
-| Sentences spoken whole (one segment) | **88 %** | 61 % |
-| Word error rate | **10.3 %** | 22.9 % |
-| Words lost | **1.4 %** | 7.1 % |
-| Sentence ends found (recall) | **90 %** | 42 % |
-| Questions ending in `?` | **19/26** | 7/23 |
-| Latency, median · p90 · max | **0.7 s · 2.4 s · 9.3 s** | 1.0 s · 2.4 s · 8.9 s |
-| Speech service CPU (avg) | **4.8 %** | 25.5 % |
+| Sentences spoken whole (one segment) | **88 %** | 59 % |
+| Word error rate | **10.3 %** | 23.8 % |
+| Words lost | **1.4 %** | 6.8 % |
+| Sentence ends found (recall) | **90 %** | 44 % |
+| Questions ending in `?` | **18/25** | 10/22 |
+| Latency, median · p90 · max | **0.7 s · 2.3 s · 9.3 s** | 1.0 s · 2.5 s · 8.9 s |
+| Speech service CPU (avg) | **5.7 %** | 27.6 % |
 
 SFSpeechRecognizer's segmentation was rewritten after 0.3.1. On the same audio it went from 14.7 % of the words lost and 55 % of sentences whole to 7.1 % and 61 %, with a worst latency of 8.9 s instead of 22.3 s ([what changed](docs/benchmarks/2026-09-24-apple-m1.md#sfspeechrecognizer-new-segmentation)).
 
