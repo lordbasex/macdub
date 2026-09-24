@@ -1,13 +1,36 @@
 # Plan: stop SFSpeechRecognizer from losing words
 
-**Status:** not started · **Opened:** 2026-09-23, after MacDub 0.3.1 · **Roadmap:** *Next* #2
+**Status:** done except words lost (7.1 %, goal 5 %) and the checks on real audio and macOS 15 — see [Outcome](#outcome) · **Opened:** 2026-09-23, after MacDub 0.3.1 · **Roadmap:** *Next* #2
 
 `SFSpeechRecognizer` is the only recognition engine on macOS 15 (and the fallback when
 SpeechAnalyzer fails on macOS 26). It loses about 14 % of the words and speaks half of the
 sentences in pieces. This file is everything needed to pick the work up cold: read it, run the
 baseline, then work down the approaches in order.
 
-## Where it stands
+## Outcome
+
+Measured on 2026-09-24 with 30 minutes of audio, against 0.3.1 on the same audio and macOS 27.0 ([report](../benchmarks/2026-09-24-apple-m1.md#sfspeechrecognizer-new-segmentation)):
+
+| Done when | 0.3.1 | now | |
+|---|---|---|---|
+| Words lost ≤ 5 % | 14.7 % | 7.1 % | ✗ what is left is the recognizer: the pipeline drops < 1 % |
+| Word error rate ≤ 25 % | 36.3 % | 22.9 % | ✓ |
+| Sentences whole ≥ 60 % | 55.4 % | 61.2 % | ✓ |
+| Latency median ≤ 1.5 s, max ≤ 10 s | 1.1 · 22.3 s | 1.0 · 8.9 s | ✓ |
+| No repeated text | 7 words | 0 | ✓ |
+| SpeechAnalyzer unchanged | | 9.8 % WER, 84.9 % whole, same latency | ✓ |
+| Real audio (Chrome), macOS 15 | | | not yet |
+
+The report lists what changed. What the plan did not know:
+
+- SFSpeechRecognizer **restarts its transcript inside a task** after a pause, and sometimes resends a revised copy of the previous utterance. Handling both was the largest single gain.
+- Approach 2 works only one task at a time. A second on-device task cancels the first (error 301), even on another `SFSpeechRecognizer`. So the new request buffers audio until the old task's final arrives (about 1 s).
+- Approach 3 (replaying audio at the seam) became unnecessary. Losses at rotations dropped to about 1 word each.
+- Approach 4: 30 s runs lose *more* words than 45 s runs (less context). The rotation now waits for an audio pause between 30 and 45 s.
+- Partial results carry no word timestamps (all 0). Pauses have to come from the audio level.
+- The segmentation rules were tuned offline, by replaying a run's logged partial results and the audio's pauses through `TranscriptSegmenter` (seconds per variant instead of 30 minutes).
+
+## Where it stood (0.3.1)
 
 From the M1 benchmark ([report](../benchmarks/2026-09-23-apple-m1.md)), 28 minutes of speech:
 

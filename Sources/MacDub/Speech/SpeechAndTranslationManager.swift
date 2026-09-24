@@ -44,6 +44,11 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     private var timer: DispatchSourceTimer?
     private var isRunning = false
     private var recentFailures: [Date] = []
+    /// Runs the engine is still finishing after a rotation (`finishesPreviousRun`), oldest first,
+    /// each with the segmenter state it had: their last words come out before anything newer.
+    private var finishingRuns: [TranscriptSegmenter] = []
+    /// Segments of the current run waiting for `finishingRuns` to end, in order.
+    private var heldSegments: [String] = []
     /// Provisional text from engines that segment finals only, shown after the pending text.
     private var volatileTail = ""
     /// SpeechAnalyzer: segment finalized results only (see `SpeechAnalyzerEngine.segmentsFinalsOnly`).
@@ -57,9 +62,30 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     private var lastSoundAt = Date()
     private let soundLock = NSLock()
     private let soundThreshold: Float = 0.01  // ≈ −40 dBFS
-    /// SpeechAnalyzer reports text in bursts every few seconds, so a pause in *text* is not a
-    /// pause in speech. For it a silence cut also needs quiet *audio*, or text stalled this long.
-    private let analyzerStallFlush: TimeInterval = 6
+    /// A pause in *text* is not a pause in speech: SpeechAnalyzer reports in bursts every few
+    /// seconds, and SFSpeechRecognizer stalls for a second or more while people keep talking
+    /// (rotating then lost the words being said). A silence cut also needs quiet *audio*, or
+    /// text stalled this long.
+    private var stallFlush: TimeInterval { engineKind == .analyzer ? 6 : 3 }
+
+    /// SFSpeechRecognizer: end of the last pause in the audio (quiet for `pauseLength`), the
+    /// kind speakers leave between sentences. Text that stops growing shortly after one is cut
+    /// there without rotating (`pauseCut`); written from the capture thread, read on `queue`.
+    private var lastPauseEnd: Date?
+    private var quietSince: Date?
+    private let pauseLength: TimeInterval = 0.25
+    /// The periodic rotation happens at the first pause in the audio during the last this-long
+    /// of `maxTaskDuration`, so it rarely lands mid-sentence (longer runs recognise worse).
+    private let rotationWindow: TimeInterval = 15
+
+    /// Whether the audio is in a pause right now (at least `pauseLength` quiet).
+    private func audioQuiet(now: Date) -> Bool {
+        soundLock.lock(); defer { soundLock.unlock() }
+        return quietSince.map { now.timeIntervalSince($0) >= pauseLength } ?? false
+    }
+
+    /// Text stalled this long after an audio pause: emit it (sentence end, SFSpeechRecognizer).
+    private let pauseCut: TimeInterval = 0.6
 
     init(translator: TranslationBridge) {
         self.translator = translator
@@ -113,7 +139,10 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
             self.receivedTranscript = false
             self.volatileTail = ""
             self.segmenter = TranscriptSegmenter()
+            self.finishingRuns.removeAll()
+            self.heldSegments.removeAll()
             self.segmenter.silenceFlushInterval = self.silenceFlushInterval
+            self.configureSegmenter(for: kind)
             self.isRunning = true
             self.recentFailures.removeAll()
             self.startTimer()
@@ -145,6 +174,12 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
                 self.onPartial?(self.livePartial)
             }
         }
+        engine.onPreviousRunEnded = { [weak self, weak engine] text in
+            self?.queue.async {
+                guard let self, self.engine === engine else { return }
+                self.handlePreviousRunEnded(text)
+            }
+        }
         engine.onRunEnded = { [weak self, weak engine] error in
             self?.queue.async {
                 guard let self, self.engine === engine else { return }
@@ -153,6 +188,16 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         }
         try engine.start(locale: locale)
         return engine
+    }
+
+    /// SFSpeechRecognizer punctuates little and provisionally: wait for text after a period, and
+    /// let unpunctuated speech run longer before a time cut (audio pauses cut sentences sooner).
+    private func configureSegmenter(for kind: RecognitionEngineKind) {
+        guard kind == .legacy else { return }
+        segmenter.terminatorNeedsFollowingText = true
+        segmenter.maxPendingDuration = 8
+        segmenter.clauseSplitCharacters = 160
+        segmenter.maxSegmentCharacters = 240
     }
 
     /// SpeechAnalyzer failed at runtime before delivering any text: swap to SFSpeechRecognizer
@@ -165,6 +210,9 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
             engineKind = .legacy
             recentFailures.removeAll()
             segmenter.reset()
+            configureSegmenter(for: .legacy)
+            finishingRuns.removeAll()
+            releaseHeldSegments()
             Log.speech.notice("SpeechAnalyzer failed at runtime; switched to SFSpeechRecognizer")
             onEngineChanged?(.legacy)
             return true
@@ -179,6 +227,8 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
             self.timer?.cancel()
             self.timer = nil
             if let rest = self.segmenter.flush() { self.emit(rest) }
+            self.finishingRuns.removeAll()
+            self.releaseHeldSegments()
             self.volatileTail = ""
             self.onPartial?("")
             self.engine?.stop()
@@ -193,19 +243,36 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         if let samples = buffer.floatChannelData, buffer.frameLength > 0 {
             var peak: Float = 0
             vDSP_maxmgv(samples[0], 1, &peak, vDSP_Length(buffer.frameLength))
+            let now = Date()
+            soundLock.lock()
             if peak > soundThreshold {
-                soundLock.lock(); lastSoundAt = Date(); soundLock.unlock()
+                lastSoundAt = now
+                if let since = quietSince, now.timeIntervalSince(since) >= pauseLength { lastPauseEnd = now }
+                quietSince = nil
+            } else if quietSince == nil {
+                quietSince = now
             }
+            soundLock.unlock()
         }
         feedLock.lock(); let target = feed; feedLock.unlock()
         target?.append(buffer)
     }
 
-    /// Whether a pause in the transcript really is a pause in speech (see `analyzerStallFlush`).
+    /// Whether a pause in the transcript really is a pause in speech (see `stallFlush`).
     private func silenceConfirmed(now: Date) -> Bool {
-        guard engineKind == .analyzer else { return true }
         soundLock.lock(); let quietFor = now.timeIntervalSince(lastSoundAt); soundLock.unlock()
-        return quietFor >= silenceFlushInterval || now.timeIntervalSince(segmenter.lastUpdate) >= analyzerStallFlush
+        return quietFor >= silenceFlushInterval || now.timeIntervalSince(segmenter.lastUpdate) >= stallFlush
+    }
+
+    /// SFSpeechRecognizer: pending text stopped growing a moment after the speaker paused —
+    /// most likely a sentence end the recognizer did not punctuate.
+    private func pausedBeforeStall(now: Date) -> Bool {
+        guard engineKind == .legacy, segmenter.hasPending,
+              now.timeIntervalSince(segmenter.lastUpdate) >= pauseCut else { return false }
+        soundLock.lock(); let pauseEnd = lastPauseEnd; soundLock.unlock()
+        guard let pauseEnd else { return false }
+        // The pause came before the last words arrived (recognition lags the audio), not long ago.
+        return segmenter.lastUpdate.timeIntervalSince(pauseEnd) > -0.2 && now.timeIntervalSince(pauseEnd) < 2
     }
 
     // MARK: Engine events (on queue)
@@ -239,6 +306,25 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         rotate(reason: error == nil ? "run ended" : "error")
     }
 
+    /// The oldest run being finished delivered its last transcript: emit the words it had not
+    /// reported yet, then whatever the newer run produced meanwhile.
+    private func handlePreviousRunEnded(_ text: String) {
+        guard isRunning, !finishingRuns.isEmpty else { return }
+        var run = finishingRuns.removeFirst()
+        if !text.isEmpty {
+            onRawTranscript?("<previous run: \(text)>", true)
+            for chunk in run.update(transcript: text) { send(chunk) }
+        }
+        if let rest = run.flush() { send(rest) }
+        if finishingRuns.isEmpty { releaseHeldSegments() }
+    }
+
+    private func releaseHeldSegments() {
+        let held = heldSegments
+        heldSegments.removeAll()
+        for text in held { send(text) }
+    }
+
     /// What is still being heard: pending text plus any provisional tail.
     private var livePartial: String {
         let pending = segmenter.uncommitted
@@ -251,7 +337,11 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
         guard isRunning else { return }
         onRawTranscript?("<rotate: \(reason)>", false)
         var holdBack = false
-        if let rest = segmenter.flush() {
+        if engine?.finishesPreviousRun == true {
+            // The run's last results are still coming: its final completes the last word.
+            if let head = segmenter.flushKeepingLastWord() { emit(head) }
+            finishingRuns.append(segmenter)
+        } else if let rest = segmenter.flush() {
             // A provisional tail may end mid-word ("predomin"): keep its last word for the next
             // run instead of emitting a fragment, unless the text ends a sentence or clause.
             if engine?.tailIsVolatile == true, let last = rest.last, !".?!,;:".contains(last),
@@ -273,7 +363,12 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
 
     // MARK: Emission
 
+    /// Emit a segment of the current run, after the last words of any run still finishing.
     private func emit(_ text: String) {
+        if finishingRuns.isEmpty { send(text) } else { heldSegments.append(text) }
+    }
+
+    private func send(_ text: String) {
         var segment = Segment(original: text)
         Log.speech.info("Segment: \(text, privacy: .public)")
         onSegmentRecognized?(segment)
@@ -304,12 +399,25 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     private func tick() {
         guard isRunning, let engine else { return }
         let now = Date()
-        if segmenter.shouldFlushForSilence(now: now), silenceConfirmed(now: now) {
+        let textStalled = segmenter.shouldFlushForSilence(now: now)
+        if textStalled, silenceConfirmed(now: now) {
             rotate(reason: "silence")
-        } else if let chunk = segmenter.cutByTime(now: now) {
+        } else if textStalled, engineKind == .legacy, let chunk = segmenter.flush() {
+            // SFSpeechRecognizer stalls like this mostly at sentence ends: cut there, but keep
+            // the task — the speaker has not stopped, and rotating would lose their words.
+            onRawTranscript?("<cut: stall>", false)
             emit(chunk)
             onPartial?(livePartial)
-        } else if engine.needsPeriodicRestart, now.timeIntervalSince(segmenter.runStartedAt) > maxTaskDuration {
+        } else if pausedBeforeStall(now: now), let chunk = segmenter.flush() {
+            onRawTranscript?("<cut: pause>", false)
+            emit(chunk)
+            onPartial?(livePartial)
+        } else if let chunk = segmenter.cutByTime(now: now) {
+            onRawTranscript?("<cut: time>", false)
+            emit(chunk)
+            onPartial?(livePartial)
+        } else if engine.needsPeriodicRestart, now.timeIntervalSince(segmenter.runStartedAt) > maxTaskDuration - rotationWindow,
+                  audioQuiet(now: now) || now.timeIntervalSince(segmenter.runStartedAt) > maxTaskDuration {
             rotate(reason: "max duration")
         }
     }

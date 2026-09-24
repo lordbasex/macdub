@@ -207,7 +207,7 @@ Casks/macdub.rb                Homebrew cask (updated by release.sh)
 
 **Capture.** *Tap engine:* `CATapDescription(stereoMixdownOfProcesses:)` over the app's audio processes (its pid, child processes, bundle-id prefixes, WebKit for Safari) or `stereoGlobalTapButExcludeProcesses` for the whole system, with `muteBehavior = .mutedWhenTapped`; the tap sits in a private aggregate device with the default output, and the IO callback copies input → output scaled by the chosen gain and produces a mono copy for recognition. *ScreenCaptureKit engine:* an audio-only `SCStream` with `SCContentFilter(display:including:)` / `excludingApplications:`, `excludesCurrentProcessAudio = true`.
 
-**Recognition & segmentation.** A `RecognitionEngine` streams a continuously revised transcript. `TranscriptSegmenter` cuts it as soon as a sentence terminator appears, at a clause mark past 90 characters, at the last space before 160, after 4.5 s of pending text without a pause, or on silence; it re-anchors on the tail of already-emitted text when the recognizer rewrites earlier words. `SFSpeechRecognizer` runs are rotated (silence, error, 45 s) because they degrade over time.
+**Recognition & segmentation.** A `RecognitionEngine` streams a continuously revised transcript. `TranscriptSegmenter` cuts it as soon as a sentence terminator appears, at a clause mark past 90 characters, at the last space before 160, after 4.5 s of pending text without a pause, or on silence; when the recognizer rewrites earlier words it aligns the words already emitted with the new text, so nothing is spoken twice. `SFSpeechRecognizer` gets its own rules: sentence ends also come from a pause in the audio followed by a stall in the text, a period at the end of a partial result waits for the next word, and a transcript the recognizer restarts inside a task is detected. Its runs are rotated on real silence, on errors, and at a pause 30–45 s in; a rotated run finishes its audio rather than being cancelled, so no words are dropped at the seam.
 
 **Translation.** `TranslationSession` only exists inside SwiftUI's `.translationTask`; an invisible `TranslationHostView` keeps that closure alive as a job loop.
 
@@ -217,18 +217,21 @@ Casks/macdub.rb                Homebrew cask (updated by release.sh)
 
 ## Benchmarks
 
-MacDub's two speech engines were benchmarked on the same audio through the real dubbing pipeline — [Apple M1, 2026-09-23](docs/benchmarks/2026-09-23-apple-m1.md) (28 minutes of speech, one engine at a time):
+MacDub's two speech engines were benchmarked on the same audio through the real dubbing pipeline — [Apple M1, macOS 27, 2026-09-24](docs/benchmarks/2026-09-24-apple-m1.md) (30 minutes of speech, one engine at a time):
 
 | | SpeechAnalyzer (macOS 26) | SFSpeechRecognizer |
 |---|---|---|
-| Sentences spoken whole (one segment) | **85 %** | 49 % |
-| Word error rate | **9.8 %** | 31.6 % |
-| Sentence ends found (recall) | **90 %** | 25 % |
-| Questions ending in `?` | **19/26** | 5/22 |
-| Latency, median · p90 · max | 2.3 s · 4.1 s · 12.4 s | 1.1 s · 3.1 s · 7.1 s |
-| Speech service CPU (avg) | **5.4 %** | 22.7 % |
+| Sentences spoken whole (one segment) | **85 %** | 61 % |
+| Word error rate | **9.8 %** | 22.9 % |
+| Words lost | **1.3 %** | 7.1 % |
+| Sentence ends found (recall) | **90 %** | 42 % |
+| Questions ending in `?` | **19/26** | 7/23 |
+| Latency, median · p90 · max | 2.3 s · 4.1 s · 12.4 s | 1.0 s · 2.4 s · 8.9 s |
+| Speech service CPU (avg) | **4.8 %** | 25.5 % |
 
-SpeechAnalyzer waits for its finalized, corrected sentences; after 10 s without one it speaks what it has up to the last comma, trading a few whole sentences (92 → 85 %) for no long silences ([details](docs/benchmarks/2026-09-23-apple-m1.md#update-latency-cap-macdub-031)).
+SFSpeechRecognizer's segmentation was rewritten after 0.3.1. On the same audio it went from 14.7 % of the words lost and 55 % of sentences whole to 7.1 % and 61 %, with a worst latency of 8.9 s instead of 22.3 s ([what changed](docs/benchmarks/2026-09-24-apple-m1.md#sfspeechrecognizer-new-segmentation)).
+
+SpeechAnalyzer waits for its finalized, corrected sentences; after 10 s without one it speaks what it has up to the last comma, trading a few whole sentences (92 → 85 %) for no long silences ([details](docs/benchmarks/2026-09-23-apple-m1.md#update-latency-cap-macdub-031), macOS 26.7).
 
 Run it on your Mac — especially M2, M3, M4, M5 and M6, which haven't been measured yet — and send the report as a pull request:
 
@@ -263,7 +266,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 
 - Latency of roughly 1–3 s is inherent to sentence-by-sentence dubbing.
 - On-device speech languages are limited to those with a downloaded Dictation model (usually the system language plus en-US).
-- `SFSpeechRecognizer` punctuates poorly for fast talkers; on macOS 26 `SpeechAnalyzer` is used instead when available.
+- `SFSpeechRecognizer` punctuates poorly and misses about 7 % of the words in the benchmark (the recognizer itself, not the pipeline); on macOS 26 `SpeechAnalyzer` is used instead when available.
 - With `SpeechAnalyzer` a sentence is spoken once it is complete — about 2.3 s after it ends (median), a little later than `SFSpeechRecognizer`'s fragments, in exchange for whole sentences. When SpeechAnalyzer holds a sentence back (it sometimes merges two), MacDub speaks it after at most ~10–12 s.
 - Safari plays audio through shared WebKit XPC processes; tapping Safari can affect other WebKit apps.
 - No speaker diarization: everyone gets the same voice (the data model has a `speaker` field ready for it).
@@ -282,6 +285,7 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 - [x] System status in Settings: chip, cores, memory, macOS, speech engine, Apple Intelligence.
 - [x] Summaries show elapsed seconds live and, when done, time, exact tokens (Apple Intelligence, Claude Code, Codex, Ollama, LM Studio) and cost (Claude Code); Apple Intelligence summaries fit the model's 4,096-token window.
 - [x] Settings › Permissions: reset MacDub's permissions and relaunch in one click; a single instance of the app at a time.
+- [x] `SFSpeechRecognizer` segmentation rewritten: words lost 14.7 → 7.1 %, word error rate 36.3 → 22.9 %, whole sentences 55 → 61 %, worst latency 22.3 → 8.9 s ([plan](docs/plans/sfspeech-segmentation.md)).
 - [x] 0.3.1: MCP server hardened (DNS rebinding, path traversal, unsafe file deletion, malformed requests), SpeechAnalyzer waits bounded (worst latency 19.6 → 12.4 s), VoiceOver names on the main screens, verified on Intel.
 
 ### Next
@@ -289,7 +293,6 @@ Builds the universal app, signs and notarizes (when the identity and notary prof
 In priority order, from the 0.3.1 review:
 
 - [ ] Run on macOS 15 — the only engine there is `SFSpeechRecognizer` and there is no Apple Intelligence; tested so far on Apple Silicon (M1, macOS 26.7) and Intel.
-- [ ] Improve `SFSpeechRecognizer` segmentation: it loses ~14 % of the words at run rotations and silence cuts, and speaks half the sentences in pieces — [plan](docs/plans/sfspeech-segmentation.md).
 - [ ] Authenticate the app's internal commands (XPC or a shared secret instead of open distributed notifications) and require a token on the MCP HTTP transport by default.
 - [ ] Automated tests for the app and the MCP server: `SessionStore`, MCP tools and HTTP transport, `Shell.run`.
 - [ ] VoiceOver in Settings, the menu bar panel, the floating subtitle bar and the History list, and a full session driven with VoiceOver.

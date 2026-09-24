@@ -32,11 +32,20 @@ protocol RecognitionEngine: AnyObject {
     /// `restart()`, except that the last word of the volatile tail was *not* emitted by the
     /// manager: it must come back at the start of the next results.
     func restart(holdingBackLastWord: Bool)
+
+    /// Whether `restart()` lets the previous run finish (its audio ended, not cancelled) and
+    /// reports its last transcript through `onPreviousRunEnded`.
+    var finishesPreviousRun: Bool { get }
+    /// The last transcript of the run `restart()` ended, once it finished or gave up ("" if it
+    /// said nothing more). Called exactly once per restart when `finishesPreviousRun`.
+    var onPreviousRunEnded: ((String) -> Void)? { get set }
 }
 
 extension RecognitionEngine {
     var tailIsVolatile: Bool { false }
     func restart(holdingBackLastWord: Bool) { restart() }
+    var finishesPreviousRun: Bool { false }
+    var onPreviousRunEnded: ((String) -> Void)? { get { nil } set {} }
 }
 
 enum RecognitionEngineKind: String, CaseIterable, Identifiable {
@@ -93,12 +102,23 @@ final class SFSpeechEngine: RecognitionEngine {
     var onTranscript: ((String, Bool) -> Void)?
     var onRunEnded: ((Error?) -> Void)?
     var onVolatile: ((String) -> Void)?  // SFSpeechRecognizer's partials go through onTranscript
+    var onPreviousRunEnded: ((String) -> Void)?
     let needsPeriodicRestart = true
+    let finishesPreviousRun = true
+    /// Longest wait for a run whose audio was ended to deliver its final result.
+    var finishTimeout: TimeInterval = 2
 
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var generation = 0
+    /// The current run already ended by itself (final result or error): nothing to finish.
+    private var runEnded = false
+    /// Runs being finished after `restart()`: generation → last transcript seen.
+    private var finishing: [Int: (task: SFSpeechRecognitionTask?, text: String)] = [:]
+    /// Restarts that came while a run was finishing (the next task not started yet): their
+    /// empty reports must follow the finishing run's, in order.
+    private var reportsAfterFinish = 0
     private let lock = NSLock()
 
     /// Whether this Mac can recognise that language without the network.
@@ -161,34 +181,111 @@ final class SFSpeechEngine: RecognitionEngine {
         request?.append(buffer)
     }
 
+    /// Cancelling the task (what this did before) threw away the audio the request had received
+    /// but not transcribed yet — 0.5–1.5 s of speech at every rotation. Now the old request's
+    /// audio is ended and its task finishes (final result in ~1 s, or `finishTimeout`); its last
+    /// transcript goes to `onPreviousRunEnded`. The new request receives audio right away, but
+    /// its task starts only then: a second on-device task cancels the first one (error 301),
+    /// even on another `SFSpeechRecognizer`. It catches up on the buffered audio.
     func restart() {
         lock.lock()
-        task?.cancel()
+        let previous = generation
+        if task != nil, !runEnded {
+            request?.endAudio()
+            finishing[previous] = (task, lastText)
+            DispatchQueue.global().asyncAfter(deadline: .now() + finishTimeout) { [weak self] in
+                self?.finishRun(previous, cancel: true)
+            }
+        } else {
+            task?.cancel()
+        }
+        let nothingToFinish = finishing[previous] == nil
+        if nothingToFinish, deferredStart != nil {
+            // Still finishing an older run: keep collecting audio in the waiting request.
+            reportsAfterFinish += 1
+            lock.unlock()
+            return
+        }
         generation += 1
         let gen = generation
+        runEnded = false
+        lastText = ""
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
         request.taskHint = .dictation
         request.addsPunctuation = true
         self.request = request
-        guard let recognizer else { lock.unlock(); return }
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self else { return }
-            self.lock.lock(); let current = self.generation == gen; self.lock.unlock()
-            guard current else { return } // stale run
-            if let result {
-                self.onTranscript?(result.bestTranscription.formattedString, result.isFinal)
-            } else if let error {
-                self.onRunEnded?(error)
-            }
+        if nothingToFinish {
+            startTask(gen: gen, request: request)
+        } else {
+            task = nil
+            deferredStart = (gen, request)
         }
         lock.unlock()
+        if nothingToFinish { onPreviousRunEnded?("") }
+    }
+
+    /// The next run's request, collecting audio until the finishing run is done.
+    private var deferredStart: (gen: Int, request: SFSpeechAudioBufferRecognitionRequest)?
+
+    /// Called with `lock` held.
+    private func startTask(gen: Int, request: SFSpeechAudioBufferRecognitionRequest) {
+        guard let recognizer else { return }
+        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            self?.handle(result, error, gen: gen)
+        }
+    }
+
+    private var lastText = ""
+
+    private func handle(_ result: SFSpeechRecognitionResult?, _ error: Error?, gen: Int) {
+        lock.lock()
+        if finishing[gen] != nil {
+            if let result { finishing[gen]?.text = result.bestTranscription.formattedString }
+            let done = result?.isFinal == true || result == nil
+            lock.unlock()
+            if done { finishRun(gen, cancel: false) }
+            return
+        }
+        guard generation == gen else { lock.unlock(); return } // stale run
+        if let result {
+            lastText = result.bestTranscription.formattedString
+            if result.isFinal { runEnded = true }
+        } else if error != nil {
+            runEnded = true
+        }
+        lock.unlock()
+        if let result {
+            onTranscript?(result.bestTranscription.formattedString, result.isFinal)
+        } else if let error {
+            onRunEnded?(error)
+        }
+    }
+
+    /// Report a finishing run's last transcript, once.
+    private func finishRun(_ gen: Int, cancel: Bool) {
+        lock.lock()
+        guard let run = finishing.removeValue(forKey: gen) else { lock.unlock(); return }
+        if let next = deferredStart, finishing.isEmpty {
+            deferredStart = nil
+            if next.gen == generation { startTask(gen: next.gen, request: next.request) }
+        }
+        let emptyReports = finishing.isEmpty ? reportsAfterFinish : 0
+        if finishing.isEmpty { reportsAfterFinish = 0 }
+        lock.unlock()
+        if cancel { run.task?.cancel() }
+        onPreviousRunEnded?(run.text)
+        for _ in 0..<emptyReports { onPreviousRunEnded?("") }
     }
 
     func stop() {
         lock.lock()
         generation += 1
+        for run in finishing.values { run.task?.cancel() }
+        finishing.removeAll()
+        deferredStart = nil
+        reportsAfterFinish = 0
         task?.cancel()
         task = nil
         request?.endAudio()

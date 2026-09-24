@@ -1,0 +1,124 @@
+[
+ {
+  "engine": "analyzer",
+  "requested": "analyzer",
+  "audio_min": 27.844073958357185,
+  "segments": 348,
+  "wer": 9.826335458342493,
+  "sub": 7.188393053418333,
+  "del": 1.3409540558364477,
+  "ins": 1.2969883490877117,
+  "end_precision": 92.25352112676056,
+  "end_recall": 90.03436426116839,
+  "comma_precision": 81.97879858657244,
+  "comma_recall": 74.83870967741936,
+  "questions": "19/26",
+  "whole_sentences": 84.93589743589743,
+  "pieces_per_sentence": 1.1826923076923077,
+  "latency_median": 2.320958208000036,
+  "latency_p90": 4.0624527909999415,
+  "latency_max": 12.377537207999922,
+  "sentences_with_latency": "312/314",
+  "repeated_segments": 0,
+  "repeated_words": 0,
+  "max_gap_s": 15.247754250000071,
+  "events": [],
+  "windows": [
+   {
+    "from_min": 0,
+    "to_min": 10.0,
+    "wer": 8.511904761904763,
+    "latency_median": 2.2813150409999707,
+    "latency_p90": 4.211222958000008
+   },
+   {
+    "from_min": 10,
+    "to_min": 20.0,
+    "wer": 9.585492227979275,
+    "latency_median": 2.131945104000067,
+    "latency_p90": 3.6317318330000035
+   },
+   {
+    "from_min": 20,
+    "to_min": 27.79416666666667,
+    "wer": 11.773584905660377,
+    "latency_median": 2.672022833000028,
+    "latency_p90": 4.534469582999918
+   }
+  ],
+  "resources": {
+   "macdub_cpu_avg": 4.526459119707289,
+   "macdub_cpu_p95": 5.405790057273205,
+   "macdub_mem_start": 7.7506866455078125,
+   "macdub_mem_end": 10.985061645507812,
+   "macdub_mem_max": 11.000686645507812,
+   "xpc_cpu_avg": 4.8455307262569836,
+   "xpc_cpu_p95": 8.6,
+   "xpc_mem_max": 46.0,
+   "xpc_power_avg": 4.8455307262569836,
+   "macdub_power_avg": 4.234078212290503,
+   "macdub_cpu_top_avg": 4.201675977653632
+  }
+ },
+ {
+  "engine": "legacy",
+  "requested": "legacy",
+  "audio_min": 27.844073958357185,
+  "segments": 463,
+  "wer": 22.88415036271708,
+  "sub": 13.673334798856892,
+  "del": 7.122444493295229,
+  "ins": 2.088371070564959,
+  "end_precision": 82.8125,
+  "end_recall": 41.732283464566926,
+  "comma_precision": 65.0,
+  "comma_recall": 25.49019607843137,
+  "questions": "7/23",
+  "whole_sentences": 61.237785016286644,
+  "pieces_per_sentence": 1.5407166123778502,
+  "latency_median": 1.0181752089999918,
+  "latency_p90": 2.449215542000019,
+  "latency_max": 8.919100584000034,
+  "sentences_with_latency": "307/314",
+  "repeated_segments": 0,
+  "repeated_words": 0,
+  "max_gap_s": 9.852795165999964,
+  "events": [],
+  "windows": [
+   {
+    "from_min": 0,
+    "to_min": 10.0,
+    "wer": 23.214285714285715,
+    "latency_median": 0.990238292000015,
+    "latency_p90": 2.547619459000032
+   },
+   {
+    "from_min": 10,
+    "to_min": 20.0,
+    "wer": 25.38860103626943,
+    "latency_median": 1.0285109589999593,
+    "latency_p90": 2.276768084000082
+   },
+   {
+    "from_min": 20,
+    "to_min": 27.79416666666667,
+    "wer": 19.547169811320753,
+    "latency_median": 1.0237126465000301,
+    "latency_p90": 2.9158152499999233
+   }
+  ],
+  "resources": {
+   "macdub_cpu_avg": 2.5052967602508347,
+   "macdub_cpu_p95": 3.8014110485033483,
+   "macdub_mem_start": 7.828834533691406,
+   "macdub_mem_end": 9.906959533691406,
+   "macdub_mem_max": 10.031959533691406,
+   "xpc_cpu_avg": 25.498314606741573,
+   "xpc_cpu_p95": 40.6,
+   "xpc_mem_max": 78.0,
+   "xpc_power_avg": 25.498314606741573,
+   "macdub_power_avg": 2.302808988764045,
+   "macdub_cpu_top_avg": 2.289325842696629
+  }
+ }
+]

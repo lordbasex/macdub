@@ -7,7 +7,7 @@
 **Engines.**
 - **SpeechAnalyzer** (macOS 26+): `SpeechTranscriber` with volatile results. MacDub segments its *finalized* results — whole, corrected sentences — and only shows the volatile ones live.
 - **SpeechAnalyzer (volatile)** (`--analyzer-volatile`, optional): the older behaviour, segmenting volatile results as they arrive.
-- **SFSpeechRecognizer**: on-device recognition with partial results, rotated every 45 s and on silence.
+- **SFSpeechRecognizer**: on-device recognition with partial results. Runs are rotated at the first pause in the audio after 30 s (at 45 s at the latest) and on real silence; a rotated run finishes its audio instead of being cancelled.
 
 **Metrics** (`scripts/benchmark/compare.py`), after aligning recognized words to the reference (case and punctuation ignored):
 - *Word error rate*: (substitutions + deletions + insertions) / reference words.

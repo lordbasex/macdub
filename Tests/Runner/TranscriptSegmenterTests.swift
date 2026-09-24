@@ -32,6 +32,90 @@ import MacDubCore
         #expect(s.uncommitted == "Next up")
     }
 
+    @Test func restartedTranscriptKeepsPendingTextAndNewStart() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "He was at work again. He had risen out of his drug created dreams", now: t0)
+        // SFSpeechRecognizer starts a new utterance within the same task after a pause.
+        #expect(s.update(transcript: "I", now: t0) == ["He had risen out of his drug created dreams"])
+        #expect(s.uncommitted == "I")
+        #expect(s.update(transcript: "I rang the bell.", now: t0) == ["I rang the bell."])
+    }
+
+    @Test func lateRevisionOfThePreviousUtteranceIsNotRepeated() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "I rang the bell and was shown up. Then he stood before the fire", now: t0)
+        #expect(s.update(transcript: "Re", now: t0) == ["Then he stood before the fire"])
+        // SFSpeechRecognizer sends a revised full version of the utterance it restarted from.
+        #expect(s.update(transcript: "I rang the bell and was shown up. Then he stood before the fire.", now: t0) == [])
+        #expect(s.update(transcript: "Red suits you", now: t0) == [])
+        #expect(s.uncommitted == "Red suits you")
+    }
+
+    @Test func punctuationAloneIsNotASegment() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "was not abusive", now: t0)
+        #expect(s.flush() == "was not abusive")
+        #expect(s.update(transcript: "was not abusive. It", now: t0) == [])
+    }
+
+    @Test func restartWithNothingCommittedKeepsEverything() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "to me who is every moon and Abbott", now: t0)
+        #expect(s.update(transcript: "His", now: t0) == ["to me who is every moon and Abbott"])
+        #expect(s.uncommitted == "His")
+    }
+
+    @Test func shorteningRevisionIsNotARestart() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "So the the the the message", now: t0)
+        #expect(s.update(transcript: "So", now: t0) == [])
+        #expect(s.uncommitted == "So")
+    }
+
+    @Test func revisionOfTheCommittedEndRealignsByWords() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "and finally of the mission, which because", now: t0)
+        #expect(s.flush() == "and finally of the mission, which because")
+        _ = s.update(transcript: "and finally of the mission which has accomplished so", now: t0)
+        #expect(s.uncommitted == "accomplished so")
+    }
+
+    @Test func anchorRepeatedEarlierIsNotUsed() {
+        var s = TranscriptSegmenter(now: t0)
+        s.terminatorNeedsFollowingText = true
+        _ = s.update(transcript: "Threatens to send the photograph and she will do it. I know that she will do it.", now: t0)
+        #expect(s.flush() == "I know that she will do it.")
+        // The last period goes away: "will do it." now only matches the first sentence.
+        _ = s.update(transcript: "Threatens to send the photograph and she will do it. I know that she will do it you", now: t0)
+        #expect(s.uncommitted == "you")
+        #expect(s.update(transcript: "Threatens to send the photograph and she will do it. I know that she will do it. You do not. Know", now: t0) == ["You do not."])
+    }
+
+    @Test func flushKeepingLastWordLetsItGrow() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "His temperament was to intro", now: t0)
+        #expect(s.flushKeepingLastWord() == "His temperament was to")
+        #expect(s.update(transcript: "His temperament was to introduce a.", now: t0) == ["introduce a."])
+    }
+
+    @Test func flushKeepingLastWordKeepsALoneWord() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "Acting", now: t0)
+        #expect(s.flushKeepingLastWord() == nil)
+        #expect(s.uncommitted == "Acting")
+        _ = s.update(transcript: "Ends here,", now: t0)
+        #expect(s.flushKeepingLastWord() == "Ends here,")
+    }
+
+    @Test func provisionalTerminatorWaitsForFollowingText() {
+        var s = TranscriptSegmenter(now: t0)
+        s.terminatorNeedsFollowingText = true
+        #expect(s.update(transcript: "Any emotion for Irene.", now: t0) == [])
+        #expect(s.update(transcript: "Any emotion for Irene Adler.", now: t0) == [])
+        #expect(s.update(transcript: "Any emotion for Irene Adler. All", now: t0) == ["Any emotion for Irene Adler."])
+        #expect(s.uncommitted == "All")
+    }
+
     @Test func multipleSentencesInOneUpdate() {
         var s = TranscriptSegmenter(now: t0)
         #expect(s.update(transcript: "One. Two! Three? Four", now: t0) == ["One.", "Two!", "Three?"])
@@ -67,6 +151,9 @@ import MacDubCore
         #expect(s.cutByTime(now: t0.addingTimeInterval(2)) == nil, "too early")
         #expect(s.cutByTime(now: t0.addingTimeInterval(3.5)) == "one two three four five six")
         #expect(s.uncommitted == "seven eight")
+        _ = s.update(transcript: "one two three four five six seven eight nine ten eleven twelve thirteen", now: t0.addingTimeInterval(4))
+        #expect(s.cutByTime(now: t0.addingTimeInterval(5)) == nil, "the clock restarted at the cut")
+        #expect(s.cutByTime(now: t0.addingTimeInterval(7)) == "seven eight nine ten eleven")
     }
 
     @Test func timeCutPrefersClauseMark() {
@@ -76,6 +163,15 @@ import MacDubCore
         _ = s.update(transcript: "as long as you have a heads up, you expect us to be there", now: t0)
         #expect(s.cutByTime(now: t0.addingTimeInterval(2)) == "as long as you have a heads up,")
         #expect(s.uncommitted == "you expect us to be there")
+    }
+
+    @Test func timeCutIgnoresALeadingClauseMark() {
+        var s = TranscriptSegmenter(now: t0)
+        _ = s.update(transcript: "You do not know her", now: t0)
+        #expect(s.flush() == "You do not know her")
+        s.maxPendingDuration = 1
+        _ = s.update(transcript: "You do not know her, but she has a soul of steel she has the face of the most beautiful", now: t0)
+        #expect(s.cutByTime(now: t0.addingTimeInterval(2)) == "but she has a soul of steel she has the face of the")
     }
 
     @Test func timeCutRequiresMinimumWords() {
