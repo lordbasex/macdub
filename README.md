@@ -304,7 +304,8 @@ In priority order, from the 0.3.1 review:
 ### Later
 
 - [ ] Speaker diarization (voice per speaker) when Apple exposes it or a lightweight on-device model fits.
-- [ ] MacDub's own on-device neural voice, offered to the whole Mac as a speech synthesis provider (`AVSpeechSynthesisProviderAudioUnit`, an AUv3 extension, macOS 13+) with a local model such as Piper or Kokoro. Start with a proof of concept: time to first audio on an M1 and quality in Spanish, and packaging the `.appex` without Xcode.
+- [ ] A third recognition engine running Whisper or Parakeet on Apple silicon with [MLX](https://github.com/ml-explore/mlx): better accuracy and punctuation than `SFSpeechRecognizer`, the only engine on macOS 15. Fed in windows (not streaming), so it needs the latency measured. Proof of concept first: check that `mlx-swift` builds without Xcode (its Metal shaders), or else run MLX in a helper process, then compare it with the other two engines on the benchmark.
+- [ ] MacDub's own on-device neural voice, offered to the whole Mac as a speech synthesis provider (`AVSpeechSynthesisProviderAudioUnit`, an AUv3 extension, macOS 13+) with a local model such as Piper or Kokoro, run with MLX. Start with a proof of concept: time to first audio on an M1 and quality in Spanish, and packaging the `.appex` without Xcode.
 - [ ] Keep summaries (with their time and tokens) in History next to each session.
 - [ ] Serve MCP HTTP requests concurrently (a long summary blocks other clients today).
 - [ ] More UI languages from the community.
