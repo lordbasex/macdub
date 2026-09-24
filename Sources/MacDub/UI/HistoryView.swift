@@ -322,6 +322,47 @@ private struct SessionDetailView: View {
     }
 }
 
+extension LiveState.SegmentDTO {
+    /// Transcription (end of the sentence → text) · audio (text → the translated voice starts:
+    /// translation and speech) · total, as far as they are known.
+    var timings: String? {
+        let parts = [
+            speechEndedAt.map { LF("Transcription %.1f s", recognizedAt.timeIntervalSince($0)) },
+            spokenAt.map { LF("Audio %.1f s", $0.timeIntervalSince(recognizedAt)) },
+            spokenAt.map { LF("Total %.1f s", $0.timeIntervalSince(speechEndedAt ?? recognizedAt)) },
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+    }
+
+    /// Tooltip with the translation step split out.
+    var timingsDetail: String {
+        let translation = translatedAt.map { $0.timeIntervalSince(recognizedAt) } ?? 0
+        let audio = spokenAt.map { $0.timeIntervalSince(recognizedAt) } ?? 0
+        return LF("End of the sentence → text %.2f s · text → translation %.2f s · translation → voice %.2f s",
+                  speechEndedAt.map { recognizedAt.timeIntervalSince($0) } ?? 0, translation, max(0, audio - translation))
+    }
+}
+
+/// Right-click on a sentence: copy it (both lines, the original or the translation).
+struct CopyLineMenu: ViewModifier {
+    let original: String
+    let translated: String?
+    var speaker: String?
+
+    func body(content: Content) -> some View {
+        content.contextMenu {
+            Button("Copy") { copy([original, translated].compactMap { $0 }.joined(separator: "\n")) }
+            Button("Copy original") { copy(original) }
+            if let translated { Button("Copy translation") { copy(translated) } }
+        }
+    }
+
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(speaker.map { "\($0): \(text)" } ?? text, forType: .string)
+    }
+}
+
 /// A line of a live translation conversation: yours on the right in cyan, theirs on the left,
 /// like a chat, with how long each step took.
 private struct ConversationBubble: View {
@@ -352,7 +393,9 @@ private struct ConversationBubble: View {
                 if subtitles.showsTranslation, let t = segment.translated {
                     Text(t).font(.body.weight(.medium)).foregroundStyle(isCurrent ? Color.yellow.opacity(0.95) : .white)
                 }
-                if let timings { Text(timings).font(.caption2).monospacedDigit().foregroundStyle(Theme.tertiaryText) }
+                if let timings = segment.timings {
+                    Text(timings).font(.caption2).monospacedDigit().foregroundStyle(Theme.tertiaryText).help(segment.timingsDetail)
+                }
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background((mine ? Theme.cyan.accent.opacity(0.18) : Color.white.opacity(0.08)),
@@ -361,16 +404,8 @@ private struct ConversationBubble: View {
             if !mine { Spacer(minLength: 60) }
         }
         .contentShape(Rectangle())
-    }
-
-    private var timings: String? {
-        let spoken = segment.spokenAt
-        let parts = [
-            segment.speechEndedAt.map { LF("Transcription %.1f s", segment.recognizedAt.timeIntervalSince($0)) },
-            spoken.map { LF("Audio %.1f s", $0.timeIntervalSince(segment.recognizedAt)) },
-            spoken.map { LF("Total %.1f s", $0.timeIntervalSince(segment.speechEndedAt ?? segment.recognizedAt)) },
-        ].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+        .modifier(CopyLineMenu(original: segment.original, translated: segment.translated,
+                               speaker: mine ? L("You") : (segment.author.map { "\(L("Them")) (\($0))" } ?? L("Them"))))
     }
 }
 
@@ -403,11 +438,16 @@ private struct HistoryRow: View {
             if subtitles == .both, let t = segment.translated {
                 translation(t)
             }
+            if let timings = segment.timings {
+                Text(timings).font(.caption2).monospacedDigit().foregroundStyle(Theme.tertiaryText)
+                    .padding(.leading, 60).help(segment.timingsDetail)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(isCurrent ? Color.white.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
+        .modifier(CopyLineMenu(original: segment.original, translated: segment.translated))
     }
 
     /// The original is the main line when it is alone, secondary when the translation is under it.

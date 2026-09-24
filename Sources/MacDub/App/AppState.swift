@@ -969,6 +969,7 @@ final class AppState: ObservableObject {
                         guard let self, Date().timeIntervalSince(self.lastLevelUpdate) > 0.05 else { return }
                         self.lastLevelUpdate = Date()
                         self.meter.level = peak
+                        self.trackDubbedAudio(peak)
                     }
                 }
                 activeEngine = "tap"   // shown as a normal session in screenshots
@@ -1060,6 +1061,7 @@ final class AppState: ObservableObject {
                 self.lastLevelUpdate = Date()
                 self.meter.level = level
                 if level > 0.02 { self.lastAudibleAt = Date() }
+                self.trackDubbedAudio(level)
             }
         }
         speech.onEngineChanged = { [weak self] kind in
@@ -1084,6 +1086,11 @@ final class AppState: ObservableObject {
         speech.onSegmentRecognized = { [weak self] segment in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                var segment = segment
+                // The last pause in the captured audio, when recent: where the sentence ended (a
+                // video barely pauses between sentences, so it may be over already). History shows
+                // the transcription time from it.
+                if let pause = self.dubLastPause, Date().timeIntervalSince(pause) < 3 { segment.speechEndedAt = pause }
                 self.segments.append(segment)
                 if self.segments.count > self.maxSegments { self.segments.removeFirst(self.segments.count - self.maxSegments) }
             }
@@ -1100,6 +1107,8 @@ final class AppState: ObservableObject {
                     segment.skipped = true
                 }
                 if let i = self.segments.firstIndex(where: { $0.id == segment.id }) {
+                    // The translator's copy was made before the sentence's end was set here.
+                    segment.speechEndedAt = self.segments[i].speechEndedAt
                     self.segments[i] = segment
                 }
                 if let t = segment.translationLatency {
@@ -1136,6 +1145,19 @@ final class AppState: ObservableObject {
             } else if self.speaking?.segmentID == id {
                 self.speaking = nil
             }
+        }
+    }
+
+    /// Start of the last pause (≥ 0.2 s) in the captured audio, kept after the sound resumes.
+    private var dubLastPause: Date?
+    private var dubLoudAt: Date?
+
+    private func trackDubbedAudio(_ level: Float) {
+        let now = Date()
+        if level > 0.02 {
+            dubLoudAt = now
+        } else if let last = dubLoudAt, now.timeIntervalSince(last) >= 0.2, dubLastPause != last {
+            dubLastPause = last
         }
     }
 
@@ -1224,3 +1246,4 @@ final class AppState: ObservableObject {
         errorSuggestion = nil
     }
 }
+

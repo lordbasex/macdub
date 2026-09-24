@@ -481,3 +481,5 @@
 "3. Load unpacked › choose the chrome-extension folder (⌘⇧G and paste the path below)." = "3. Cargar descomprimida › elige la carpeta chrome-extension (⌘⇧G y pega la ruta de abajo).";
 "4. Reload the Meet tab. After a MacDub update, press ↻ on the extension's card." = "4. Recarga la pestaña de Meet. Después de actualizar MacDub, toca ↻ en la tarjeta de la extensión.";
 "Copy path" = "Copiar ruta";
+"Copy original" = "Copiar original";
+"Copy translation" = "Copiar traducción";
