@@ -112,6 +112,9 @@ final class AppState: ObservableObject {
 
     private let capture = AudioCaptureManager()
     private let tap = ProcessTapCaptureManager()
+    /// `demoDub`: the next start dubs this file instead of the captured app (screenshots).
+    private var demoAudio: URL?
+    private var demoFeeder: DemoAudioFeeder?
     private let speech: SpeechAndTranslationManager
     private let voice = VoiceSynthesisManager()
     private var cancellables = Set<AnyCancellable>()
@@ -440,6 +443,18 @@ final class AppState: ObservableObject {
                         self.settings.originalVolume = min(1, max(0, level))
                     }
                     if let d = note.userInfo?["duckOnlyWhileSpeaking"] as? String { self.settings.duckOnlyWhileSpeaking = (d == "true") }
+                case .demoDub:
+                    guard let path = note.userInfo?["path"] as? String, self.phase == .idle else { return }
+                    self.demoAudio = URL(fileURLWithPath: path)
+                    self.section = .dub
+                    await self.start()
+                case .demoLive:
+                    guard let me = note.userInfo?["me"] as? String, let them = note.userInfo?["them"] as? String,
+                          self.live.phase == .idle, let target = self.selectedTarget else { return }
+                    self.section = .live
+                    self.live.demoAudio = (URL(fileURLWithPath: me), URL(fileURLWithPath: them))
+                    self.prepareLive()
+                    await self.live.start(target: target)
                 case .startLive:
                     if self.live.phase == .idle { self.section = .live; self.toggleLiveTranslation() }
                 case .stopLive:
@@ -763,19 +778,25 @@ final class AppState: ObservableObject {
             else if live.phase == .idle, phase == .idle, let target = selectedTarget {
                 // The Meet extension talks to MacDub through the local server (virtual
                 // microphone switch, chat).
-                startLiveServer()
-                live.saveSessions = settings.saveSessions
-                live.recordAudio = settings.recordAudio
-                live.onArchive = { [weak self] record in
-                    do {
-                        try SessionStore.save(record)
-                        self?.refreshSessions()
-                        self?.refreshStorageSize()
-                    } catch {
-                        Log.app.error("Could not save the conversation: \(error.localizedDescription, privacy: .public)")
-                    }
-                }
+                prepareLive()
                 await live.start(target: target)
+            }
+        }
+    }
+
+    /// Before any live translation start (button, command, demo): the local server for the Meet
+    /// extension, and History's settings and saving.
+    private func prepareLive() {
+        startLiveServer()
+        live.saveSessions = settings.saveSessions
+        live.recordAudio = settings.recordAudio
+        live.onArchive = { [weak self] record in
+            do {
+                try SessionStore.save(record)
+                self?.refreshSessions()
+                self?.refreshStorageSize()
+            } catch {
+                Log.app.error("Could not save the conversation: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -940,7 +961,18 @@ final class AppState: ObservableObject {
                 if recording { recorder.append(buffer) }
             }
             notice = nil
-            if settings.usesProcessTap {
+            if let demo = demoAudio {
+                demoAudio = nil
+                demoFeeder = try DemoAudioFeeder(url: demo) { [weak self] buffer, peak in
+                    sink(buffer)
+                    Task { @MainActor [weak self] in
+                        guard let self, Date().timeIntervalSince(self.lastLevelUpdate) > 0.05 else { return }
+                        self.lastLevelUpdate = Date()
+                        self.meter.level = peak
+                    }
+                }
+                activeEngine = "tap"   // shown as a normal session in screenshots
+            } else if settings.usesProcessTap {
                 do {
                     try tap.start(target: target, onBuffer: sink)
                     activeEngine = "tap"
@@ -961,7 +993,8 @@ final class AppState: ObservableObject {
 
             settings.lastTargetBundleID = target.bundleIdentifier
             latency = LatencyStats()
-            startSilenceWatchdog()
+            // A demo feeds a file, not the app: the app's silence means nothing.
+            if demoFeeder == nil { startSilenceWatchdog() }
             phase = .running
             Log.app.info("Pipeline running (\(self.activeEngine ?? "-", privacy: .public)): \(target.name, privacy: .public) \(self.settings.sourceLocaleID, privacy: .public) → \(self.settings.targetLanguageID, privacy: .public)")
         } catch is StartCancelled {
@@ -997,6 +1030,7 @@ final class AppState: ObservableObject {
         stopSilenceWatchdog()
         await capture.stop()
         tap.stop()
+        demoFeeder?.stop(); demoFeeder = nil
         speech.stop()
         voice.stop()
         partialText = ""

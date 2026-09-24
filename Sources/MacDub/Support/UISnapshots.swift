@@ -38,14 +38,20 @@ enum UISnapshots {
                         try? await Task.sleep(for: .milliseconds(700))
                         await saveWindow(window, "\(prefix)-main-\(section.rawValue)-\(Int(size.width))x\(Int(size.height))", in: dir)
                     }
-                    // History again with the newest session open (player, spectrum, transcript).
-                    if let newest = state.sessions.first?.id {
+                    // History again with the newest session of each tab open (player, spectrum,
+                    // transcript; a conversation for live translation).
+                    let originalTab = UserDefaults.standard.string(forKey: "historyTab")
+                    for (tab, name) in [(HistoryTab.dubbing, "session"), (HistoryTab.live, "live-session")] {
+                        UserDefaults.standard.set(tab.rawValue, forKey: "historyTab")
                         state.section = .history
+                        try? await Task.sleep(for: .milliseconds(500))
+                        guard let newest = state.sessions.first(where: { $0.isLive == (tab == .live) })?.id else { continue }
                         state.historySelection = newest
                         try? await Task.sleep(for: .milliseconds(1500))
-                        await saveWindow(window, "\(prefix)-main-history-session-\(Int(size.width))x\(Int(size.height))", in: dir)
+                        await saveWindow(window, "\(prefix)-main-history-\(name)-\(Int(size.width))x\(Int(size.height))", in: dir)
                         state.historySelection = nil
                     }
+                    UserDefaults.standard.set(originalTab, forKey: "historyTab")
                 }
             }
 

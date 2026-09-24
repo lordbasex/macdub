@@ -120,6 +120,10 @@ final class LiveTranslationController: ObservableObject {
     private let defaults = UserDefaults.standard
     private let tap = ProcessTapCaptureManager()
     private var mic: LiveMicrophone?
+    /// `demoLive`: the next start is fed from these files (you, them) instead of the microphone
+    /// and the call app, and your headphones stay silent (screenshots).
+    var demoAudio: (me: URL, them: URL)?
+    private var demoFeeders: [DemoAudioFeeder] = []
     private var toThem: SpeechAndTranslationManager?
     private var fromThem: SpeechAndTranslationManager?
     private var speaker: LiveDeviceSpeaker?
@@ -253,13 +257,23 @@ final class LiveTranslationController: ObservableObject {
             toThem.onPartial = { [weak self] text in Task { @MainActor in self?.setPartial(text, side: .me) } }
             try toThem.start(sourceLocale: me, engineKind: .analyzer)
             self.toThem = toThem
-            let mic = LiveMicrophone(deviceUID: micUID.isEmpty ? nil : micUID) { [weak self, toThem, micRecorder] buffer, peak in
-                toThem.append(buffer)
-                micRecorder.append(buffer)
-                Task { @MainActor in self?.level(mic: peak) }
+            let demo = demoAudio
+            demoAudio = nil
+            if let demo {
+                demoFeeders.append(try DemoAudioFeeder(url: demo.me) { [weak self, toThem, micRecorder] buffer, peak in
+                    toThem.append(buffer)
+                    micRecorder.append(buffer)
+                    Task { @MainActor in self?.level(mic: peak) }
+                })
+            } else {
+                let mic = LiveMicrophone(deviceUID: micUID.isEmpty ? nil : micUID) { [weak self, toThem, micRecorder] buffer, peak in
+                    toThem.append(buffer)
+                    micRecorder.append(buffer)
+                    Task { @MainActor in self?.level(mic: peak) }
+                }
+                try mic.start()
+                self.mic = mic
             }
-            try mic.start()
-            self.mic = mic
 
             // Them → you.
             let fromThem = makeManager()
@@ -269,12 +283,22 @@ final class LiveTranslationController: ObservableObject {
             fromThem.onPartial = { [weak self] text in Task { @MainActor in self?.setPartial(text, side: .them) } }
             try fromThem.start(sourceLocale: them, engineKind: .analyzer)
             self.fromThem = fromThem
-            tap.onLevel = { [weak self] level in Task { @MainActor in self?.level(call: level) } }
-            try tap.start(target: target) { [fromThem, callRecorder] buffer in
-                fromThem.append(buffer)
-                callRecorder.append(buffer)
+            if let demo {
+                demoFeeders.append(try DemoAudioFeeder(url: demo.them) { [weak self, fromThem, callRecorder] buffer, peak in
+                    fromThem.append(buffer)
+                    callRecorder.append(buffer)
+                    Task { @MainActor in self?.level(call: peak) }
+                })
+                myVoice.volume = 0
+            } else {
+                myVoice.volume = 1
+                tap.onLevel = { [weak self] level in Task { @MainActor in self?.level(call: level) } }
+                try tap.start(target: target) { [fromThem, callRecorder] buffer in
+                    fromThem.append(buffer)
+                    callRecorder.append(buffer)
+                }
+                tap.passthroughGain = Float(originalVolume)
             }
-            tap.passthroughGain = Float(originalVolume)
 
             myVoice.onSegmentStarted = { [weak self] id in self?.spoke(id) }
             chatTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
@@ -297,6 +321,7 @@ final class LiveTranslationController: ObservableObject {
         let wasRunning = phase == .running
         phase = .stopping
         mic?.stop(); mic = nil
+        demoFeeders.forEach { $0.stop() }; demoFeeders.removeAll()
         tap.stop()
         toThem?.stop(); toThem = nil
         fromThem?.stop(); fromThem = nil
@@ -386,7 +411,8 @@ final class LiveTranslationController: ObservableObject {
     private func heard(_ text: String, side: Side, via: Via = .voice, author: String? = nil) {
         guard phase == .running else { return }
         var line = Line(side: side, via: via, author: author, original: text, recognizedAt: Date())
-        if via == .voice { line.speechEndedAt = quietSince[side] ?? loudAt[side] }
+        // Recognized while still speaking (a sentence inside a longer turn): its end is unknown.
+        if via == .voice { line.speechEndedAt = quietSince[side] }
         lines.append(line)
         if lines.count > 300 { lines.removeFirst(lines.count - 300) }
         #if compiler(>=6.2)

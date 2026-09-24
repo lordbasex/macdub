@@ -154,6 +154,8 @@ public enum MacDubCommand {
         case exportAudio       // seconds, path → the app writes a 16 kHz mono WAV of the last N seconds
         case snapshotUI        // path, label → PNGs of every screen (light + dark), then <label>.done
         case startLive, stopLive  // live translation with its current settings (testing, automation)
+        case demoDub           // path: dub an audio file instead of the captured app (screenshots)
+        case demoLive          // me, them: live translation fed from two audio files (screenshots)
     }
 
     public static func post(_ action: Action, bundleIdentifier: String? = nil, values: [String: String] = [:]) {

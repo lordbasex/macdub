@@ -149,18 +149,33 @@ public enum MacDubPaths {
 public enum SessionStore {
     public static var directory: URL { LiveStateStore.directory.appendingPathComponent("sessions", isDirectory: true) }
 
+    // ISO 8601 with milliseconds: live translation times each step in tenths of a second, which
+    // whole seconds erased. Files written before have no fraction and still read.
     private static let encoder: JSONEncoder = {
         let e = JSONEncoder()
-        e.dateEncodingStrategy = .iso8601
+        e.dateEncodingStrategy = .custom { date, encoder in
+            var c = encoder.singleValueContainer()
+            try c.encode(fractional().string(from: date))
+        }
         e.outputFormatting = [.sortedKeys, .prettyPrinted]
         return e
     }()
 
     private static let decoder: JSONDecoder = {
         let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
+        d.dateDecodingStrategy = .custom { decoder in
+            let text = try decoder.singleValueContainer().decode(String.self)
+            if let date = fractional().date(from: text) ?? ISO8601DateFormatter().date(from: text) { return date }
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "not an ISO 8601 date: \(text)"))
+        }
         return d
     }()
+
+    private static func fractional() -> ISO8601DateFormatter {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }
 
     /// Session ids are UUIDs. Ids arrive from MCP clients too, so anything else — "../../Claude/
     /// claude_desktop_config" would have deleted another app's settings — is refused before it

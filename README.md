@@ -10,7 +10,7 @@ MacDub captures the audio of any app (Zoom, Teams, VLC, Safari, Chrome, Music �
 
 ## Screenshots
 
-![A tour of MacDub: Dubbing, Subtitles, History with playback, AI & MCP, the menu bar panel, the floating subtitle bar and every Settings tab](images/macdub-tour.gif)
+![A tour of MacDub: Dubbing, Live translation, Subtitles, History with playback, AI & MCP, the menu bar panel, the floating subtitle bar and every Settings tab](images/macdub-tour.gif)
 
 The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Bring advanced speech-to-text to your app with SpeechAnalyzer*](https://www.youtube.com/watch?v=0m6dimDDj8M) playing in Google Chrome, English → Spanish.
 
@@ -18,8 +18,11 @@ The screenshots below were taken while MacDub dubbed Apple's WWDC25 session [*Br
 |---|---|
 | **Dubbing** — pick the app, the languages and a voice, press Start ![Dubbing screen](images/dubbing.png) | **Live transcript** — original + translation, the word being spoken highlighted, latency per sentence ![Live transcript while dubbing](images/dubbing-live.png) |
 | **Floating subtitle bar** — always on top of the video you are watching ![Floating subtitle bar](images/subtitle-bar.png) | **Menu bar panel** — status, last lines, Start/Stop and quick controls ![Menu bar panel](images/menubar.png) |
-| **History** — recorded audio with a live spectrum, the transcript following karaoke-style, playback modes ![History with player](images/history.png) | **Subtitles** — transcript options, floating bar and exports ![Subtitles screen](images/subtitles.png) |
-| **AI & MCP** — local summaries and one-click MCP registration ![AI & MCP screen](images/ai-mcp.png) | **Settings** — General, Capture, Speech, Voice, Subtitles, AI & MCP, Permissions ![Settings window](images/settings.png) |
+| **Live translation** *(beta)* — call app, microphone, both languages, a voice for each side, audio and/or chat ![Live translation setup](images/live-translation.png) | **Live conversation** — you and them side by side, a "…" bubble while someone speaks, transcription · audio · total per sentence ![Live translation conversation](images/live-conversation.png) |
+| **History › Dubbing** — recorded audio with a live spectrum, the transcript following karaoke-style, playback modes ![History with player](images/history.png) | **History › Live translation** — each conversation as a chat, both sides' audio in one take, times per sentence ![History of a live translation conversation](images/history-live.png) |
+| **Subtitles** — transcript options, floating bar and exports ![Subtitles screen](images/subtitles.png) | **AI & MCP** — local summaries and one-click MCP registration ![AI & MCP screen](images/ai-mcp.png) |
+| **Settings** — General, Capture, Speech, Voice, Subtitles, AI & MCP, Extensions, Permissions ![Settings window](images/settings.png) | **Settings › Voice** — quality badges and your own Personal Voice ![Voice settings with Personal Voice](images/settings-voice.png) |
+| **Settings › Extensions** — the Google Meet extension for live translation, one click to install ![Extensions settings](images/settings-extensions.png) | |
 
 - macOS **15 Sequoia or later** (developed on 15.7.3, also built and run on macOS 26.7 / Apple M1).
 - Universal binary — Intel and Apple Silicon.

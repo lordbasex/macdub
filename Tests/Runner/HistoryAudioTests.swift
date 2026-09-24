@@ -161,3 +161,19 @@ import MacDubCore
         #expect(txt.contains("Them (Ana): Nice to meet you"))
     }
 }
+
+@Suite struct SessionDatePrecisionTests {
+    @Test func savedTimesKeepTenthsOfASecond() throws {
+        let start = Date(timeIntervalSince1970: 1_790_000_000.25)
+        var s = Segment(original: "Hola", translated: "Hello", recognizedAt: start.addingTimeInterval(1.37))
+        s.speechEndedAt = start.addingTimeInterval(0.42)
+        let id = "precision-test-\(UUID().uuidString.prefix(8))"
+        let record = SessionRecord(id: id, startedAt: start, appName: nil, appBundleIdentifier: nil,
+                                   sourceLocale: "es-MX", targetLanguage: "en-US", segments: [s], kind: SessionRecord.liveKind)
+        try SessionStore.save(record)
+        defer { try? SessionStore.delete(id: id) }
+        let back = try SessionStore.load(id: id)
+        let dto = back.segments[0]
+        #expect(abs(dto.recognizedAt.timeIntervalSince(dto.speechEndedAt!) - 0.95) < 0.01)
+    }
+}
