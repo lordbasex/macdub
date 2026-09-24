@@ -23,11 +23,15 @@ extension LivePilot {
             let args = CommandLine.arguments
             var report: [String: Any] = [:]
             do {
+                #if compiler(>=6.2)
                 if #available(macOS 26.0, *) {
                     report = try await runLive(args)
                 } else {
                     report["error"] = "live translation pilot needs macOS 26"
                 }
+                #else
+                report["error"] = "live translation pilot needs the macOS 26 SDK"
+                #endif
             } catch {
                 report["error"] = error.localizedDescription
             }
@@ -51,6 +55,7 @@ extension LivePilot {
         init(_ message: String) { errorDescription = message }
     }
 
+    #if compiler(>=6.2)
     @available(macOS 26.0, *)
     private static func runLive(_ args: [String]) async throws -> [String: Any] {
         let from = Locale(identifier: arg("--from", in: args) ?? "es-MX")
@@ -122,6 +127,7 @@ extension LivePilot {
         ]
     }
 
+    #endif
 }
 
 /// Per-sentence timeline of the pilot.

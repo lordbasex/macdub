@@ -152,6 +152,7 @@ final class LiveTranslationController: ObservableObject {
     /// SpeechAnalyzer's languages: a language SFSpeechRecognizer knows but SpeechAnalyzer does not
     /// would fail to start.
     func loadLanguages() async {
+        #if compiler(>=6.2)   // SpeechTranscriber: macOS 26 SDK (CI also builds with the macOS 15 one)
         guard #available(macOS 26.0, *) else { return }
         let supported = await SpeechTranscriber.supportedLocales
         let installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
@@ -170,6 +171,7 @@ final class LiveTranslationController: ObservableObject {
             if $0.installed != $1.installed { return $0.installed }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
+        #endif
     }
 
     /// Re-reads the voices for both languages and fills in a choice never made: your Personal
@@ -369,9 +371,13 @@ final class LiveTranslationController: ObservableObject {
                 throw LiveError(LF("Download the %@ → %@ translation first (System Settings › General › Language & Region › Translation Languages).",
                                    from.identifier, to.identifier))
             }
+            #if compiler(>=6.2)   // TranslationSession(installedSource:): macOS 26 SDK
             let session = TranslationSession(installedSource: from.language, target: to.language)
             _ = try? await session.translate("Hola")   // loads the model before anyone speaks
             sessions[side] = session
+            #else
+            throw LiveError(L("Live translation needs macOS 26 or later."))
+            #endif
         }
     }
 
@@ -383,6 +389,7 @@ final class LiveTranslationController: ObservableObject {
         if via == .voice { line.speechEndedAt = quietSince[side] ?? loudAt[side] }
         lines.append(line)
         if lines.count > 300 { lines.removeFirst(lines.count - 300) }
+        #if compiler(>=6.2)
         guard #available(macOS 26.0, *), let session = sessions[side] as? TranslationSession else { return }
         let id = line.id
         Task {
@@ -393,6 +400,7 @@ final class LiveTranslationController: ObservableObject {
                 if let i = lines.firstIndex(where: { $0.id == id }) { lines[i].failed = true }
             }
         }
+        #endif
     }
 
     private func translated(_ id: UUID, _ text: String) {
