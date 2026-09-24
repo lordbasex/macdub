@@ -9,6 +9,8 @@ enum MacDubMain {
         // Writing to a pipe whose reader is gone (a CLI that quit early) must fail, not kill the app.
         signal(SIGPIPE, SIG_IGN)
         if RecognitionBenchmark.isRequested { RecognitionBenchmark.runAndExit() }
+        if LivePilot.isRequested { LivePilot.runAndExit() }
+        if LivePilot.isLiveRequested { LivePilot.runLiveAndExit() }
         waitForReplacedInstance()
         if let running = otherInstance() {
             // Two instances would capture, recognize and speak the same audio twice and fight

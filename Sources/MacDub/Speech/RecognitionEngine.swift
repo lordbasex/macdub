@@ -36,6 +36,9 @@ protocol RecognitionEngine: AnyObject {
     /// Whether `restart()` lets the previous run finish (its audio ended, not cancelled) and
     /// reports its last transcript through `onPreviousRunEnded`.
     var finishesPreviousRun: Bool { get }
+    /// The speaker paused: turn what is still provisional into final results now instead of
+    /// waiting for more speech (SpeechAnalyzer holds a lone sentence back for seconds).
+    func finalizeAtPause()
     /// The last transcript of the run `restart()` ended, once it finished or gave up ("" if it
     /// said nothing more). Called exactly once per restart when `finishesPreviousRun`.
     var onPreviousRunEnded: ((String) -> Void)? { get set }
@@ -45,6 +48,7 @@ extension RecognitionEngine {
     var tailIsVolatile: Bool { false }
     func restart(holdingBackLastWord: Bool) { restart() }
     var finishesPreviousRun: Bool { false }
+    func finalizeAtPause() {}
     var onPreviousRunEnded: ((String) -> Void)? { get { nil } set {} }
 }
 

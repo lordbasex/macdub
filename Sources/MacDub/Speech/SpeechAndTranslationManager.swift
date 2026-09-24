@@ -78,6 +78,14 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     /// of `maxTaskDuration`, so it rarely lands mid-sentence (longer runs recognise worse).
     private let rotationWindow: TimeInterval = 15
 
+    /// Live translation: when the speaker pauses this long, ask the engine to finalize what it
+    /// heard (a conversation has a sentence and then silence; dubbing leaves it off). 0: never.
+    var finalizeAfterPause: TimeInterval = 0
+    /// Live translation: SpeechAnalyzer's `.fastResults` (see `SpeechAnalyzerEngine.fastResults`).
+    var analyzerFastResults = false
+    /// The pause `finalizeAtPause` was already asked for (once per pause).
+    private var finalizedPause: Date?
+
     /// Whether the audio is in a pause right now (at least `pauseLength` quiet).
     private func audioQuiet(now: Date) -> Bool {
         soundLock.lock(); defer { soundLock.unlock() }
@@ -157,6 +165,7 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
             let analyzer = SpeechAnalyzerEngine()
             analyzer.segmentsFinalsOnly = analyzerFinalsOnly
             if let cap = analyzerHardCap { analyzer.volatileHardCap = cap }
+            analyzer.fastResults = analyzerFastResults
             engine = analyzer
         }
         #endif
@@ -399,6 +408,14 @@ final class SpeechAndTranslationManager: NSObject, @unchecked Sendable {
     private func tick() {
         guard isRunning, let engine else { return }
         let now = Date()
+        if finalizeAfterPause > 0, !volatileTail.isEmpty || segmenter.hasPending {
+            soundLock.lock(); let quiet = quietSince; soundLock.unlock()
+            if let quiet, now.timeIntervalSince(quiet) >= finalizeAfterPause, finalizedPause != quiet {
+                finalizedPause = quiet
+                onRawTranscript?("<finalize at pause>", false)
+                engine.finalizeAtPause()
+            }
+        }
         let textStalled = segmenter.shouldFlushForSilence(now: now)
         if textStalled, silenceConfirmed(now: now) {
             rotate(reason: "silence")

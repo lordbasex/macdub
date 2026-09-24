@@ -52,10 +52,14 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         return installed.contains { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
     }
 
+    /// Live translation: `.fastResults`. Without it SpeechAnalyzer may process a conversation
+    /// (a sentence, then silence) in blocks of ~12 s of audio, so each sentence waited that long.
+    var fastResults = false
+
     func start(locale: Locale) throws {
         let transcriber = SpeechTranscriber(locale: locale,
                                             transcriptionOptions: [],
-                                            reportingOptions: [.volatileResults],
+                                            reportingOptions: fastResults ? [.volatileResults, .fastResults] : [.volatileResults],
                                             attributeOptions: [])
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         self.transcriber = transcriber
@@ -230,6 +234,11 @@ final class SpeechAnalyzerEngine: RecognitionEngine {
         if error == nil, out.frameLength > 0 {
             input.yield(AnalyzerInput(buffer: out))
         }
+    }
+
+    func finalizeAtPause() {
+        guard let analyzer else { return }
+        Task { try? await analyzer.finalize(through: nil) }
     }
 
     var tailIsVolatile: Bool {

@@ -39,6 +39,6 @@
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>MacDub captures the audio of the application you choose so it can be translated and dubbed, and lowers the original under the translated voice.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>MacDub does not use the microphone. This entry exists only because the Speech framework declares it.</string>
+	<string>Live translation listens to your microphone, translates what you say on-device and speaks it to the people in your call. Dubbing does not use the microphone.</string>
 </dict>
 </plist>

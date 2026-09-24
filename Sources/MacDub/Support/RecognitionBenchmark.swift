@@ -58,13 +58,27 @@ enum RecognitionBenchmark {
         guard let out = value("--out", in: args) else { throw Failure("missing --out") }
         let requested = RecognitionEngineKind(rawValue: value("--engine", in: args) ?? "auto") ?? .auto
         let locale = Locale(identifier: value("--locale", in: args) ?? "en-US")
-        let speed = Double(value("--speed", in: args) ?? "1") ?? 1
-        let limit = Double(value("--seconds", in: args) ?? "") ?? .infinity
 
         if SFSpeechRecognizer.authorizationStatus() != .authorized {
             let status = await SpeechAndTranslationManager.requestAuthorization()
             guard status == .authorized else { throw Failure("Speech Recognition not authorized (\(status.rawValue))") }
         }
+
+        // --also <file> --also-engine <e> --also-out <json>: a second pipeline in this same process
+        // at the same time (live translation needs two: the microphone and the call).
+        if let alsoPath = value("--also", in: args), let alsoOut = value("--also-out", in: args) {
+            let alsoEngine = RecognitionEngineKind(rawValue: value("--also-engine", in: args) ?? "auto") ?? .auto
+            async let second: Void = pipeline(path: alsoPath, out: alsoOut, requested: alsoEngine, locale: locale, args: args)
+            try await pipeline(path: path, out: out, requested: requested, locale: locale, args: args)
+            try await second
+        } else {
+            try await pipeline(path: path, out: out, requested: requested, locale: locale, args: args)
+        }
+    }
+
+    private static func pipeline(path: String, out: String, requested: RecognitionEngineKind, locale: Locale, args: [String]) async throws {
+        let speed = Double(value("--speed", in: args) ?? "1") ?? 1
+        let limit = Double(value("--seconds", in: args) ?? "") ?? .infinity
 
         let file = try AVAudioFile(forReading: URL(fileURLWithPath: path))
         let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
@@ -93,6 +107,9 @@ enum RecognitionBenchmark {
         manager.analyzerFinalsOnly = !args.contains("--analyzer-volatile")
         // --analyzer-cap <s>: SpeechAnalyzer's longest wait for a final (tuning runs).
         manager.analyzerHardCap = value("--analyzer-cap", in: args).flatMap(Double.init)
+        // --finalize-after <s>: finalize at pauses this long (live translation).
+        manager.finalizeAfterPause = value("--finalize-after", in: args).flatMap(Double.init) ?? 0
+        manager.analyzerFastResults = args.contains("--fast-results")
         let process = ProcessSampler()
         let clock = ContinuousClock()
         let started = clock.now

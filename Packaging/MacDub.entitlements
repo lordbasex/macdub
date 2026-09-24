@@ -3,10 +3,12 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  MacDub needs no special entitlements: ScreenCaptureKit, Speech, Translation and
-	  AVFAudio are all gated by TCC prompts, not entitlements. The app is NOT sandboxed
-	  (Developer ID distribution). If you ever target the Mac App Store, add
-	  com.apple.security.app-sandbox here.
+	  ScreenCaptureKit, Speech, Translation and AVFAudio are gated by TCC prompts. The
+	  hardened runtime also needs this entitlement before the microphone prompt can appear:
+	  live translation hears the person through it. The app is NOT sandboxed (Developer ID
+	  distribution). If you ever target the Mac App Store, add com.apple.security.app-sandbox.
 	-->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 </dict>
 </plist>
